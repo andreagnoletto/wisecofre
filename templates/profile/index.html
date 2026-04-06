@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Meu Perfil — Wisecofre{% endblock %}
+{% block page_title %}Meu Perfil{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left: Profile form -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-person me-2"></i>Dados Pessoais</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'profile' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="firstName" class="form-label">Nome</label>
+                        <input type="text" class="form-control" id="firstName" name="first_name" value="{{ user.first_name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="lastName" class="form-label">Sobrenome</label>
+                        <input type="text" class="form-control" id="lastName" name="last_name" value="{{ user.last_name }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" value="{{ user.email }}" readonly disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="locale" class="form-label">Idioma</label>
+                        <select class="form-select" id="locale" name="locale">
+                            <option value="pt-br" {% if user.locale == "pt-br" %}selected{% endif %}>Português (BR)</option>
+                            <option value="en" {% if user.locale == "en" %}selected{% endif %}>English</option>
+                            <option value="es" {% if user.locale == "es" %}selected{% endif %}>Español</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="avatarUrl" class="form-label">URL do Avatar</label>
+                        <input type="url" class="form-control" id="avatarUrl" name="avatar_url" value="{{ user.avatar_url|default:'' }}" placeholder="https://…">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Salvar Alterações</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="col-lg-7">
+        <!-- Change password -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-lock me-2"></i>Alterar Senha</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'profile_change_password' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="currentPwd" class="form-label">Senha atual</label>
+                        <input type="password" class="form-control" id="currentPwd" name="current_password" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="newPwd" class="form-label">Nova senha</label>
+                            <input type="password" class="form-control" id="newPwd" name="new_password" required>
+                        </div>
+                        <div class="col-6">
+                            <label for="confirmPwd" class="form-label">Confirmar</label>
+                            <input type="password" class="form-control" id="confirmPwd" name="confirm_password" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-warning">Alterar Senha</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- MFA -->
+        <div class="card shadow-sm mb-4" x-data="{ showBackup: false }">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-phone me-2"></i>Autenticação MFA (TOTP)</h5>
+                {% if user.totp_enabled %}
+                <span class="badge bg-success">Ativo</span>
+                {% else %}
+                <span class="badge bg-secondary">Inativo</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Compatível com Google Authenticator, Microsoft Authenticator, Authy e outros apps TOTP.
+                </p>
+                {% if user.totp_enabled %}
+                <p class="mb-2">TOTP está ativo. Você possui <strong>{{ user.backup_codes_count }}</strong> códigos de backup restantes.</p>
+                <div class="d-flex gap-2">
+                    <form method="post" action="{% url 'mfa_disable' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm"
+                                onclick="return confirm('Desativar MFA? Você perderá os códigos de backup.');">Desativar TOTP</button>
+                    </form>
+                    <button class="btn btn-outline-secondary btn-sm" @click="showBackup = !showBackup">
+                        <i class="bi bi-eye me-1"></i> Códigos de backup
+                    </button>
+                </div>
+                <div x-show="showBackup" x-transition class="mt-3 p-3 bg-light rounded" style="display:none;">
+                    {% for code in backup_codes %}
+                    <code class="me-2 d-inline-block mb-1">{{ code.code }}</code>
+                    {% empty %}
+                    <span class="text-muted">Nenhum código disponível.</span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-3">Ative a autenticação de dois fatores para maior segurança.</p>
+                <a href="{% url 'mfa_setup' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-qr-code me-1"></i> Ativar TOTP
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- GPG Keys -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Chaves GPG</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#uploadGpgModal">
+                    <i class="bi bi-upload me-1"></i> Enviar Chave
+                </button>
+            </div>
+            {% if gpg_keys %}
+            <ul class="list-group list-group-flush">
+                {% for key in gpg_keys %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <code>{{ key.fingerprint|truncatechars:24 }}</code>
+                        <small class="text-muted ms-2">{{ key.key_type }} {{ key.bits }}b</small>
+                        {% if key.expires_at %}
+                        <small class="text-muted ms-2">Expira: {{ key.expires_at|date:"d/m/Y" }}</small>
+                        {% endif %}
+                    </div>
+                    <form method="post" action="{% url 'gpg_key_delete' key.id %}" onsubmit="return confirm('Remover esta chave?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="card-body text-center py-4">
+                <p class="text-muted mb-0">Nenhuma chave GPG cadastrada.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Upload GPG Key Modal -->
+<div class="modal fade" id="uploadGpgModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" action="{% url 'gpg_key_upload' %}" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title">Enviar Chave GPG</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="gpgKey" class="form-label">Chave pública (ASCII-armored)</label>
+                    <textarea class="form-control font-monospace" id="gpgKey" name="public_key" rows="8"
+                              placeholder="-----BEGIN PGP PUBLIC KEY BLOCK-----" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary">Enviar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

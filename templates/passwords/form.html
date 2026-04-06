@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block page_title %}{{ form_title|default:"Nova Senha" }}{% endblock %}
+
+{% block content %}
+<div class="row g-4" x-data="passwordGenerator()">
+    <!-- Form -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="post" id="password-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_name" class="form-label fw-semibold">Nome <span class="text-danger">*</span></label>
+                        <input type="text" name="name" id="id_name" class="form-control" required value="{{ resource.name|default:'' }}">
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="id_username" class="form-label fw-semibold">Usuário</label>
+                            <input type="text" name="username" id="id_username" class="form-control" value="{{ resource.username|default:'' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_uri" class="form-label fw-semibold">URL</label>
+                            <input type="url" name="uri" id="id_uri" class="form-control" placeholder="https://…" value="{{ resource.uri|default:'' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_secret" class="form-label fw-semibold">Senha</label>
+                        <div class="input-group">
+                            <input :type="showPassword ? 'text' : 'password'" name="secret" id="id_secret" class="form-control font-monospace" x-model="generated">
+                            <button type="button" class="btn btn-outline-secondary" @click="showPassword = !showPassword" title="Mostrar/ocultar">
+                                <i class="bi" :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" @click="generate()" title="Gerar senha">
+                                <i class="bi bi-arrow-repeat me-1"></i> Gerar
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label fw-semibold">Descrição</label>
+                        <textarea name="description" id="id_description" class="form-control" rows="3">{{ resource.description|default:'' }}</textarea>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="id_folder" class="form-label fw-semibold">Pasta</label>
+                            <select name="folder" id="id_folder" class="form-select">
+                                <option value="">— Nenhuma —</option>
+                                {% for folder in folders %}
+                                <option value="{{ folder.pk }}" {% if resource.folder_id|stringformat:"s" == folder.pk|stringformat:"s" %}selected{% endif %}>
+                                    {{ folder.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_tags" class="form-label fw-semibold">Tags</label>
+                            <input type="text" name="tags" id="id_tags" class="form-control" placeholder="Ex: trabalho, banco" value="">
+                            <div class="form-text">Separe por vírgula.</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i> Salvar
+                        </button>
+                        <a href="{% url 'password_list' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Password generator panel -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-shield-check me-1"></i> Gerador de Senha
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between">
+                        <span>Comprimento</span>
+                        <strong x-text="length"></strong>
+                    </label>
+                    <input type="range" class="form-range" min="8" max="128" x-model.number="length" @input="generate()">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="gen-upper" x-model="upper" @change="generate()">
+                            <label class="form-check-label" for="gen-upper">Maiúsculas (A-Z)</label>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="gen-lower" x-model="lower" @change="generate()">
+                            <label class="form-check-label" for="gen-lower">Minúsculas (a-z)</label>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="gen-digits" x-model="digits" @change="generate()">
+                            <label class="form-check-label" for="gen-digits">Números (0-9)</label>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="gen-symbols" x-model="symbols" @change="generate()">
+                            <label class="form-check-label" for="gen-symbols">Especiais (!@#…)</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <div class="input-group">
+                        <input type="text" class="form-control font-monospace bg-light" x-model="generated" readonly>
+                        <button type="button" class="btn btn-outline-secondary" @click="navigator.clipboard.writeText(generated); $dispatch('notify',{message:'Senha copiada!',type:'success'})">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+                </div>
+                <div>
+                    <small class="text-muted">Força:</small>
+                    <div class="progress mt-1" style="height:6px;">
+                        <div class="progress-bar" :class="strengthClass" :style="`width:${strengthPercent}%`"></div>
+                    </div>
+                    <small class="text-muted" x-text="strengthLabel"></small>
+                </div>
+                <button type="button" class="btn btn-primary w-100 mt-3" @click="generate()">
+                    <i class="bi bi-arrow-repeat me-1"></i> Gerar Nova
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function passwordGenerator() {
+    return {
+        length: 20,
+        upper: true,
+        lower: true,
+        digits: true,
+        symbols: true,
+        showPassword: false,
+        generated: '{{ secret.data|default:"" }}',
+        get strengthPercent() {
+            let s = 0, g = this.generated;
+            if (!g) return 0;
+            if (g.length >= 8) s += 20;
+            if (g.length >= 16) s += 20;
+            if (/[a-z]/.test(g)) s += 15;
+            if (/[A-Z]/.test(g)) s += 15;
+            if (/[0-9]/.test(g)) s += 15;
+            if (/[^a-zA-Z0-9]/.test(g)) s += 15;
+            return Math.min(s, 100);
+        },
+        get strengthClass() {
+            let p = this.strengthPercent;
+            if (p < 40) return 'bg-danger';
+            if (p < 70) return 'bg-warning';
+            return 'bg-success';
+        },
+        get strengthLabel() {
+            let p = this.strengthPercent;
+            if (!this.generated) return '';
+            if (p < 40) return 'Fraca';
+            if (p < 70) return 'Razoável';
+            return 'Forte';
+        },
+        generate() {
+            let chars = '';
+            if (this.upper) chars += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            if (this.lower) chars += 'abcdefghijklmnopqrstuvwxyz';
+            if (this.digits) chars += '0123456789';
+            if (this.symbols) chars += '!@#$%^&*()_+-=[]{}|;:,.<>?';
+            if (!chars) { this.generated = ''; return; }
+            let arr = new Uint32Array(this.length);
+            crypto.getRandomValues(arr);
+            this.generated = Array.from(arr, v => chars[v % chars.length]).join('');
+        },
+        init() { if (!this.generated) this.generate(); }
+    };
+}
+</script>
+{% endblock %}

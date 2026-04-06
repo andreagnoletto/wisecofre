@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block page_title %}Senhas{% endblock %}
+
+{% block content %}
+<!-- Toolbar -->
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <form method="get" class="d-flex flex-grow-1 gap-2" style="max-width:500px;">
+        <div class="input-group">
+            <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+            <input type="text" name="q" class="form-control" placeholder="Buscar senhas…" value="{{ request.GET.q|default:'' }}">
+        </div>
+        <select name="filter" class="form-select" style="max-width:180px;" onchange="this.form.submit()">
+            <option value="" {% if not request.GET.filter %}selected{% endif %}>Todas</option>
+            <option value="mine" {% if request.GET.filter == "mine" %}selected{% endif %}>Minhas</option>
+            <option value="shared" {% if request.GET.filter == "shared" %}selected{% endif %}>Compartilhadas</option>
+            <option value="expired" {% if request.GET.filter == "expired" %}selected{% endif %}>Expiradas</option>
+            <option value="favorites" {% if request.GET.filter == "favorites" %}selected{% endif %}>Favoritas</option>
+        </select>
+        <button type="submit" class="btn btn-outline-secondary">Filtrar</button>
+    </form>
+    <a href="{% url 'password_create' %}" class="btn btn-primary ms-auto">
+        <i class="bi bi-plus-lg me-1"></i> Nova Senha
+    </a>
+</div>
+
+<!-- Table -->
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Usuário</th>
+                    <th>URL</th>
+                    <th>Tipo</th>
+                    <th>Pasta</th>
+                    <th class="text-end">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for resource in resources %}
+                <tr>
+                    <td>
+                        <a href="{% url 'password_detail' resource.pk %}" class="text-decoration-none fw-semibold">
+                            {{ resource.name }}
+                        </a>
+                    </td>
+                    <td>
+                        <span class="font-monospace small">{{ resource.username|default:"—" }}</span>
+                        {% if resource.username %}
+                        <button type="button" class="btn btn-sm btn-link p-0 ms-1" title="Copiar"
+                                onclick="navigator.clipboard.writeText('{{ resource.username|escapejs }}'); $dispatch('notify', {message:'Usuário copiado', type:'success'})">
+                            <i class="bi bi-clipboard small"></i>
+                        </button>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if resource.uri %}
+                            <a href="{{ resource.uri }}" target="_blank" rel="noopener" class="text-decoration-none small">
+                                {{ resource.uri|truncatechars:35 }}
+                            </a>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary-subtle text-secondary">{{ resource.resource_type|default:"login" }}</span>
+                    </td>
+                    <td class="text-muted small">{{ resource.folder.name|default:"—" }}</td>
+                    <td class="text-end">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'password_detail' resource.pk %}"><i class="bi bi-eye me-2"></i>Ver</a></li>
+                                <li>
+                                    <button class="dropdown-item" onclick="copySecret({{ resource.pk }})">
+                                        <i class="bi bi-clipboard-check me-2"></i>Copiar Senha
+                                    </button>
+                                </li>
+                                <li><a class="dropdown-item" href="{% url 'password_detail' resource.pk %}"><i class="bi bi-share me-2"></i>Compartilhar</a></li>
+                                <li><a class="dropdown-item" href="{% url 'password_edit' resource.pk %}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form method="post" action="{% url 'password_delete' resource.pk %}" onsubmit="return confirm('Excluir esta senha?')">
+                                        {% csrf_token %}
+                                        <button class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Excluir</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5">
+                        <i class="bi bi-key fs-1 text-muted d-block mb-2"></i>
+                        <p class="text-muted mb-2">Nenhuma senha encontrada.</p>
+                        <a href="{% url 'password_create' %}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i> Criar primeira senha
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if page_obj.has_other_pages %}
+<nav class="mt-3 d-flex justify-content-center">
+    <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q|default:'' }}&filter={{ request.GET.filter|default:'' }}">&laquo;</a></li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+            <li class="page-item"><a class="page-link" href="?page={{ num }}&q={{ request.GET.q|default:'' }}&filter={{ request.GET.filter|default:'' }}">{{ num }}</a></li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q|default:'' }}&filter={{ request.GET.filter|default:'' }}">&raquo;</a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

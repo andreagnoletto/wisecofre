@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}{{ group.name }} — Wisecofre{% endblock %}
+{% block page_title %}{{ group.name }}{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'group_list' %}">Grupos</a></li>
+            <li class="breadcrumb-item active">{{ group.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Group info -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h4 class="mb-1">{{ group.name }}</h4>
+                    <p class="text-muted mb-0">
+                        Criado por <strong>{{ group.created_by.get_full_name|default:group.created_by.email }}</strong>
+                        em {{ group.created_at|date:"d/m/Y H:i" }}
+                    </p>
+                </div>
+                <a href="{% url 'group_edit' group.id %}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Editar
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Members -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-people me-2"></i>Membros</h5>
+            <span class="badge bg-primary rounded-pill">{{ members|length }}</span>
+        </div>
+        <div class="card-body">
+            <!-- Add member -->
+            <form method="post" action="{% url 'group_add_member' group.id %}" class="row g-2 mb-3">
+                {% csrf_token %}
+                <div class="col">
+                    <select name="user_id" class="form-select" required>
+                        <option value="">Selecionar usuário…</option>
+                        {% for u in available_users %}
+                        <option value="{{ u.id }}">{{ u.get_full_name }} ({{ u.email }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-person-plus me-1"></i> Adicionar
+                    </button>
+                </div>
+            </form>
+
+            {% if members %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Usuário</th>
+                            <th>Email</th>
+                            <th>Papel</th>
+                            <th class="text-end">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in members %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:32px;height:32px;font-size:13px;">
+                                        {{ m.user.first_name|default:"U"|first|upper }}
+                                    </span>
+                                    {{ m.user.get_full_name|default:"—" }}
+                                </div>
+                            </td>
+                            <td>{{ m.user.email }}</td>
+                            <td>
+                                {% if m.is_admin %}
+                                <span class="badge bg-danger">Admin</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Membro</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <form method="post" action="{% url 'group_toggle_admin' group.id m.user.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Alternar admin">
+                                        <i class="bi bi-shield{% if m.is_admin %}-check{% endif %}"></i>
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'group_remove_member' group.id m.user.id %}" class="d-inline"
+                                      onsubmit="return confirm('Remover {{ m.user.get_full_name }} do grupo?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover">
+                                        <i class="bi bi-person-dash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted text-center mb-0">Nenhum membro neste grupo.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Shared resources -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="bi bi-share me-2"></i>Recursos Compartilhados</h5>
+        </div>
+        {% if shared_resources %}
+        <ul class="list-group list-group-flush">
+            {% for res in shared_resources %}
+            <li class="list-group-item d-flex align-items-center gap-2">
+                {% if res.resource_type == 'password' %}
+                <i class="bi bi-key text-primary"></i>
+                {% elif res.resource_type == 'file' %}
+                <i class="bi bi-file-earmark-lock text-success"></i>
+                {% else %}
+                <i class="bi bi-box text-secondary"></i>
+                {% endif %}
+                <span>{{ res.name }}</span>
+                <span class="badge bg-light text-dark ms-auto">{{ res.resource_type }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="card-body text-center py-4">
+            <p class="text-muted mb-0">Nenhum recurso compartilhado com este grupo.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

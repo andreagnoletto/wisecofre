@@ -1,0 +1,27 @@
+{% for folder in nodes %}
+<a href="{% url 'folder_detail' folder.id %}" class="list-group-item list-group-item-action d-flex align-items-center py-2"
+   style="padding-left: {{ level|add:1 }}rem;">
+    <i class="bi bi-folder-fill text-warning me-2"></i>
+    <span class="fw-medium me-2">{{ folder.name }}</span>
+    <span class="badge bg-secondary rounded-pill me-auto">{{ folder.resources.count }}</span>
+
+    <div class="dropdown" onclick="event.preventDefault(); event.stopPropagation();">
+        <button class="btn btn-sm btn-link text-muted p-0" data-bs-toggle="dropdown">
+            <i class="bi bi-three-dots-vertical"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+                <form method="post" action="{% url 'folder_delete' folder.id %}" onsubmit="return confirm('Excluir a pasta {{ folder.name }}?');">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Excluir</button>
+                </form>
+            </li>
+        </ul>
+    </div>
+</a>
+{% with folder.children.all as children %}
+{% if children %}
+{% include "folders/_tree.html" with nodes=children level=level|add:1 %}
+{% endif %}
+{% endwith %}
+{% endfor %}

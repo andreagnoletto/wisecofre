@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Ativar MFA — Wisecofre{% endblock %}
+{% block page_title %}Ativar Autenticação de Dois Fatores{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <div class="bg-primary bg-gradient text-white rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width:64px;height:64px;">
+                        <i class="bi bi-phone fs-2"></i>
+                    </div>
+                    <h5>Configure seu aplicativo autenticador</h5>
+                    <p class="text-muted small">
+                        Escaneie o QR code com <strong>Google Authenticator</strong>, <strong>Microsoft Authenticator</strong>,
+                        <strong>Authy</strong> ou qualquer app compatível com TOTP.
+                    </p>
+                </div>
+
+                <div class="text-center mb-4" x-data="{ show: false }">
+                    <div id="qrcode" class="d-inline-block p-3 bg-white border rounded mb-2"></div>
+
+                    <div class="mt-2">
+                        <button class="btn btn-link btn-sm text-muted" @click="show = !show" type="button">
+                            <i class="bi bi-eye me-1"></i> Mostrar chave manual
+                        </button>
+                        <div x-show="show" x-transition class="mt-2" style="display:none;">
+                            <code class="fs-6 user-select-all">{{ secret }}</code>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="post" action="{% url 'mfa_setup' %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="code" class="form-label fw-semibold">Código de 6 dígitos</label>
+                        <input type="text" class="form-control form-control-lg text-center font-monospace"
+                               name="code" id="code" maxlength="6" pattern="\d{6}"
+                               placeholder="000000" required autofocus autocomplete="one-time-code">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg me-1"></i> Verificar e Ativar
+                    </button>
+                </form>
+
+                <div class="text-center mt-3">
+                    <a href="{% url 'profile' %}" class="text-muted small">Cancelar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+<script>
+    QRCode.toCanvas(document.createElement('canvas'), "{{ provisioning_uri }}", {width: 220}, function(err, canvas) {
+        if (!err) document.getElementById('qrcode').appendChild(canvas);
+    });
+</script>
+{% endblock %}

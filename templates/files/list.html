@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block page_title %}Arquivos{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+    <div class="btn-group" role="group">
+        <a href="?category=" class="btn btn-sm {% if not request.GET.category %}btn-primary{% else %}btn-outline-secondary{% endif %}">Todos</a>
+        <a href="?category=document" class="btn btn-sm {% if request.GET.category == 'document' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Documentos</a>
+        <a href="?category=image" class="btn btn-sm {% if request.GET.category == 'image' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Imagens</a>
+        <a href="?category=spreadsheet" class="btn btn-sm {% if request.GET.category == 'spreadsheet' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Planilhas</a>
+        <a href="?category=key" class="btn btn-sm {% if request.GET.category == 'key' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Chaves</a>
+        <a href="?category=archive" class="btn btn-sm {% if request.GET.category == 'archive' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Arquivos compactados</a>
+    </div>
+    <div class="ms-auto d-flex gap-2">
+        <form method="get" class="d-flex">
+            {% if request.GET.category %}<input type="hidden" name="category" value="{{ request.GET.category }}">{% endif %}
+            <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Buscar arquivos..." style="min-width:200px;">
+        </form>
+        <a href="{% url 'file_upload' %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Upload
+        </a>
+    </div>
+</div>
+
+{% if files %}
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width:40px;">Tipo</th>
+                    <th>Nome</th>
+                    <th>Tamanho</th>
+                    <th>Enviado por</th>
+                    <th>Data</th>
+                    <th style="width:60px;">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr>
+                    <td>
+                        {% if file.mime_category == 'document' %}
+                            <i class="bi bi-file-earmark-text fs-5 text-primary"></i>
+                        {% elif file.mime_category == 'image' %}
+                            <i class="bi bi-file-earmark-image fs-5 text-success"></i>
+                        {% elif file.mime_category == 'archive' %}
+                            <i class="bi bi-file-earmark-zip fs-5 text-warning"></i>
+                        {% elif file.mime_category == 'key' %}
+                            <i class="bi bi-file-earmark-lock fs-5 text-danger"></i>
+                        {% elif file.mime_category == 'spreadsheet' %}
+                            <i class="bi bi-file-earmark-spreadsheet fs-5 text-success"></i>
+                        {% else %}
+                            <i class="bi bi-file-earmark fs-5 text-secondary"></i>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'file_detail' file.pk %}" class="text-decoration-none fw-medium">
+                            {{ file.resource.name }}
+                        </a>
+                    </td>
+                    <td class="text-muted small">
+                        {% if file.size_bytes >= 1048576 %}
+                            {{ file.size_mb }} MB
+                        {% else %}
+                            {% widthratio file.size_bytes 1024 1 %} KB
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ file.resource.created_by.get_full_name|default:file.resource.created_by.email }}</td>
+                    <td class="text-muted small">{{ file.resource.created_at|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'file_download' file.pk %}">
+                                        <i class="bi bi-download me-2"></i>Download
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'file_detail' file.pk %}#share">
+                                        <i class="bi bi-share me-2"></i>Compartilhar
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'file_detail' file.pk %}">
+                                        <i class="bi bi-info-circle me-2"></i>Detalhes
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <button class="dropdown-item text-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ file.pk }}">
+                                        <i class="bi bi-trash me-2"></i>Excluir
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                        <!-- Delete modal -->
+                        <div class="modal fade" id="deleteModal{{ file.pk }}" tabindex="-1">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h6 class="modal-title">Confirmar exclusão</h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">Excluir <strong>{{ file.resource.name }}</strong>?</div>
+                                    <div class="modal-footer">
+                                        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                        <form method="post" action="{% url 'file_delete' file.pk %}">
+                                            {% csrf_token %}
+                                            <button class="btn btn-sm btn-danger">Excluir</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-4 d-flex justify-content-center">
+    <ul class="pagination pagination-sm">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">&laquo;</a>
+        </li>
+        {% endif %}
+        {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+            {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ num }}</a>
+            </li>
+            {% endif %}
+        {% endfor %}
+        {% if page_obj.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.category %}&category={{ request.GET.category }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">&raquo;</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-file-earmark-lock display-1 text-muted"></i>
+    <h5 class="mt-3 text-muted">Nenhum arquivo encontrado</h5>
+    <p class="text-muted">Seus arquivos criptografados aparecerão aqui.</p>
+    <a href="{% url 'file_upload' %}" class="btn btn-primary">
+        <i class="bi bi-upload me-1"></i>Enviar arquivo
+    </a>
+</div>
+{% endif %}
+{% endblock %}

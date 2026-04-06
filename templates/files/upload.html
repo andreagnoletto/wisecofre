@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block page_title %}Upload de Arquivo{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-7 col-xl-6" x-data="fileUploader()">
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" enctype="multipart/form-data" @submit="uploading = true" x-ref="form">
+                    {% csrf_token %}
+
+                    <div class="border border-2 border-dashed rounded-3 p-5 text-center position-relative"
+                         :class="dragover ? 'border-primary bg-primary bg-opacity-10' : 'border-secondary'"
+                         @dragover.prevent="dragover = true"
+                         @dragleave.prevent="dragover = false"
+                         @drop.prevent="dragover = false; handleDrop($event)"
+                         @click="$refs.fileInput.click()"
+                         style="cursor:pointer;">
+                        <input type="file" name="file" x-ref="fileInput" class="d-none" @change="selectFile($event)" required>
+                        <template x-if="!fileName">
+                            <div>
+                                <i class="bi bi-cloud-arrow-up display-3 text-muted"></i>
+                                <p class="mt-3 mb-1 fw-medium">Arraste um arquivo ou clique para selecionar</p>
+                                <p class="small text-muted mb-0">Tamanho máximo: 10 MB</p>
+                            </div>
+                        </template>
+                        <template x-if="fileName">
+                            <div @click.stop>
+                                <i class="bi display-3" :class="fileIcon"></i>
+                                <p class="mt-3 mb-1 fw-medium" x-text="fileName"></p>
+                                <p class="small text-muted mb-0" x-text="fileSize"></p>
+                                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" @click="clearFile()">
+                                    <i class="bi bi-x-lg me-1"></i>Remover
+                                </button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label small text-muted">Pasta (opcional)</label>
+                        <select name="folder" class="form-select form-select-sm">
+                            <option value="">Nenhuma pasta</option>
+                            {% for folder in folders %}
+                            <option value="{{ folder.pk }}">{{ folder.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 mt-4" :disabled="!fileName || uploading">
+                        <template x-if="!uploading">
+                            <span><i class="bi bi-cloud-arrow-up me-1"></i>Enviar Arquivo</span>
+                        </template>
+                        <template x-if="uploading">
+                            <span><span class="spinner-border spinner-border-sm me-2"></span>Enviando...</span>
+                        </template>
+                    </button>
+
+                    <p class="text-muted small text-center mt-3 mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Tamanho máximo: 10 MB.
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.border-dashed { border-style: dashed !important; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function fileUploader() {
+    return {
+        fileName: '',
+        fileSize: '',
+        fileType: '',
+        dragover: false,
+        uploading: false,
+
+        get fileIcon() {
+            const t = this.fileType;
+            if (t.startsWith('image/')) return 'bi-file-earmark-image text-success';
+            if (t.includes('pdf') || t.includes('word') || t.includes('text')) return 'bi-file-earmark-text text-primary';
+            if (t.includes('zip') || t.includes('rar') || t.includes('tar') || t.includes('7z') || t.includes('gzip')) return 'bi-file-earmark-zip text-warning';
+            if (t.includes('sheet') || t.includes('excel') || t.includes('csv')) return 'bi-file-earmark-spreadsheet text-success';
+            if (t.includes('key') || t.includes('pgp') || t.includes('pem') || t.includes('cert')) return 'bi-file-earmark-lock text-danger';
+            return 'bi-file-earmark text-secondary';
+        },
+
+        formatSize(bytes) {
+            if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+            return (bytes / 1024).toFixed(0) + ' KB';
+        },
+
+        selectFile(event) {
+            const f = event.target.files[0];
+            if (f) {
+                this.fileName = f.name;
+                this.fileSize = this.formatSize(f.size);
+                this.fileType = f.type;
+            }
+        },
+
+        handleDrop(event) {
+            const f = event.dataTransfer.files[0];
+            if (f) {
+                const dt = new DataTransfer();
+                dt.items.add(f);
+                this.$refs.fileInput.files = dt.files;
+                this.fileName = f.name;
+                this.fileSize = this.formatSize(f.size);
+                this.fileType = f.type;
+            }
+        },
+
+        clearFile() {
+            this.$refs.fileInput.value = '';
+            this.fileName = '';
+            this.fileSize = '';
+            this.fileType = '';
+        }
+    };
+}
+</script>
+{% endblock %}

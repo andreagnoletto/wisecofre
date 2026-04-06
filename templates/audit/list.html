@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria — Wisecofre{% endblock %}
+{% block page_title %}Auditoria{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small">Usuário</label>
+                    <select name="user" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        {% for u in filter_users %}
+                        <option value="{{ u.id }}" {% if request.GET.user == u.id|slugify %}selected{% endif %}>{{ u.get_full_name|default:u.email }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Ação</label>
+                    <select name="action" class="form-select form-select-sm">
+                        <option value="">Todas</option>
+                        {% for code, label in action_choices %}
+                        <option value="{{ code }}" {% if request.GET.action == code %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">Todos</option>
+                        <option value="success" {% if request.GET.status == "success" %}selected{% endif %}>Sucesso</option>
+                        <option value="fail" {% if request.GET.status == "fail" %}selected{% endif %}>Falha</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm flex-fill">
+                        <i class="bi bi-funnel me-1"></i> Filtrar
+                    </button>
+                    <a href="{% url 'audit_export_csv' %}?{{ request.GET.urlencode }}" class="btn btn-outline-secondary btn-sm flex-fill">
+                        <i class="bi bi-download me-1"></i> CSV
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Logs table -->
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data/Hora</th>
+                        <th>Usuário</th>
+                        <th>Ação</th>
+                        <th>Status</th>
+                        <th>IP</th>
+                        <th>Detalhes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td class="text-nowrap small">{{ log.created_at|date:"d/m/Y H:i:s" }}</td>
+                        <td>
+                            {% if log.user %}
+                            <span class="fw-medium">{{ log.user.get_full_name|default:log.user.email }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.action_label }}</td>
+                        <td>
+                            {% if log.status == 'success' %}
+                            <span class="badge bg-success">Sucesso</span>
+                            {% else %}
+                            <span class="badge bg-danger">Falha</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ log.ip_address|default:"—" }}</td>
+                        <td class="small text-muted">
+                            {% if log.context and log.context.params %}
+                            {% for k, v in log.context.params.items %}{{ k }}={{ v }} {% endfor %}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">Nenhum registro encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

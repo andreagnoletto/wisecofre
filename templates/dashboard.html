@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card bg-primary text-white border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-key fs-1 opacity-75"></i>
+                <div>
+                    <h2 class="mb-0 fw-bold">{{ total_passwords|default:"0" }}</h2>
+                    <small class="opacity-75">Total de senhas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card bg-success text-white border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-share fs-1 opacity-75"></i>
+                <div>
+                    <h2 class="mb-0 fw-bold">{{ shared_with_me|default:"0" }}</h2>
+                    <small class="opacity-75">Compartilhadas comigo</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card bg-info text-white border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-file-earmark-lock fs-1 opacity-75"></i>
+                <div>
+                    <h2 class="mb-0 fw-bold">{{ total_files|default:"0" }}</h2>
+                    <small class="opacity-75">Arquivos armazenados</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card bg-danger text-white border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-exclamation-triangle fs-1 opacity-75"></i>
+                <div>
+                    <h2 class="mb-0 fw-bold">{{ expired_count|default:"0" }}</h2>
+                    <small class="opacity-75">Senhas expiradas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Recent activity -->
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">
+                <i class="bi bi-clock-history me-1"></i> Atividade recente
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Data</th>
+                                <th>Usuário</th>
+                                <th>Ação</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td class="text-nowrap small text-muted">{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                                <td>{{ log.user }}</td>
+                                <td>{{ log.action }}</td>
+                                <td>
+                                    {% if log.status == "success" %}
+                                        <span class="badge bg-success-subtle text-success">Sucesso</span>
+                                    {% elif log.status == "failure" %}
+                                        <span class="badge bg-danger-subtle text-danger">Falha</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary">{{ log.status }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-4">Nenhuma atividade recente.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expired passwords -->
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm border-start border-danger border-3">
+            <div class="card-header bg-white fw-semibold text-danger">
+                <i class="bi bi-exclamation-triangle me-1"></i> Senhas expiradas
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nome</th>
+                                <th>Expirou em</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in expired_resources %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'password_detail' r.pk %}" class="text-decoration-none">{{ r.name }}</a>
+                                </td>
+                                <td class="small text-muted">{{ r.expires_at|date:"d/m/Y" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="2" class="text-center text-muted py-4">Nenhuma senha expirada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Usuários — Wisecofre{% endblock %}
+{% block page_title %}Usuários{% endblock %}
+
+{% block content %}
+<div>
+    <!-- Top bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <form method="get" class="d-flex gap-2" style="max-width:360px;">
+            <input type="search" name="q" value="{{ request.GET.q }}" class="form-control" placeholder="Buscar por nome ou email…">
+            <button type="submit" class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+        </form>
+        <button class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#inviteModal">
+            <i class="bi bi-plus-lg"></i> Convidar Usuário
+        </button>
+    </div>
+
+    <!-- Users table -->
+    <div class="card shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Usuário</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>GPG</th>
+                        <th>Último login</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:36px;height:36px;font-size:14px;">
+                                    {{ u.first_name|default:"U"|first|upper }}
+                                </span>
+                                <span class="fw-medium">{{ u.get_full_name|default:"—" }}</span>
+                            </div>
+                        </td>
+                        <td>{{ u.email }}</td>
+                        <td>
+                            {% if u.role == 'ADMIN' %}
+                            <span class="badge bg-danger">ADMIN</span>
+                            {% elif u.role == 'GUEST' %}
+                            <span class="badge bg-secondary">GUEST</span>
+                            {% else %}
+                            <span class="badge bg-primary">USER</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.is_active %}
+                            <span class="badge bg-success-subtle text-success">Ativo</span>
+                            {% else %}
+                            <span class="badge bg-danger-subtle text-danger">Suspenso</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if u.has_gpg_key %}
+                            <i class="bi bi-shield-check text-success" title="Chave GPG configurada"></i>
+                            {% else %}
+                            <i class="bi bi-shield-x text-muted" title="Sem chave GPG"></i>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ u.last_login|date:"d/m/Y H:i"|default:"Nunca" }}</td>
+                        <td class="text-end">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="{% url 'user_detail' u.id %}"><i class="bi bi-eye me-2"></i>Ver</a></li>
+                                    <li>
+                                        <form method="post" action="{% url 'user_toggle_active' u.id %}">
+                                            {% csrf_token %}
+                                            {% if u.is_active %}
+                                            <button type="submit" class="dropdown-item"><i class="bi bi-pause-circle me-2"></i>Suspender</button>
+                                            {% else %}
+                                            <button type="submit" class="dropdown-item"><i class="bi bi-play-circle me-2"></i>Reativar</button>
+                                            {% endif %}
+                                        </form>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form method="post" action="{% url 'user_delete' u.id %}" onsubmit="return confirm('Excluir {{ u.get_full_name }}?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Excluir</button>
+                                        </form>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">Nenhum usuário encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Invite Modal -->
+    <div class="modal fade" id="inviteModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="post" action="{% url 'user_invite' %}" class="modal-content">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Convidar Usuário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="inviteEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="inviteEmail" name="email" required>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label for="inviteFirst" class="form-label">Nome</label>
+                            <input type="text" class="form-control" id="inviteFirst" name="first_name">
+                        </div>
+                        <div class="col-6">
+                            <label for="inviteLast" class="form-label">Sobrenome</label>
+                            <input type="text" class="form-control" id="inviteLast" name="last_name">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="inviteRole" class="form-label">Role</label>
+                        <select class="form-select" id="inviteRole" name="role">
+                            <option value="USER">Usuário</option>
+                            <option value="ADMIN">Administrador</option>
+                            <option value="GUEST">Convidado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Enviar Convite</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

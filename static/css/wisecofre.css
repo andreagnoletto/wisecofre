@@ -1,0 +1,49 @@
+/* Wisecofre - Custom styles (Tailwind handles the majority) */
+
+/* Smooth transitions for sidebar collapse */
+aside {
+    transition: width 200ms ease-in-out;
+}
+
+aside span {
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* Drag-and-drop active state pulse */
+.drag-active {
+    animation: pulse-border 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-border {
+    0%, 100% { border-color: rgb(129 140 248); }
+    50% { border-color: rgb(99 102 241); }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgb(209 213 219);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(156 163 175);
+}
+
+/* Toast enter animation */
+#toast-container > div {
+    animation: slide-in 300ms ease-out;
+}
+
+@keyframes slide-in {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}

@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block page_title %}Arquivo: {{ file.resource.name }}{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Left column -->
+    <div class="col-lg-8">
+        <!-- Info card -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    {% if file.mime_category == 'document' %}
+                        <i class="bi bi-file-earmark-text display-2 text-primary"></i>
+                    {% elif file.mime_category == 'image' %}
+                        <i class="bi bi-file-earmark-image display-2 text-success"></i>
+                    {% elif file.mime_category == 'archive' %}
+                        <i class="bi bi-file-earmark-zip display-2 text-warning"></i>
+                    {% elif file.mime_category == 'key' %}
+                        <i class="bi bi-file-earmark-lock display-2 text-danger"></i>
+                    {% elif file.mime_category == 'spreadsheet' %}
+                        <i class="bi bi-file-earmark-spreadsheet display-2 text-success"></i>
+                    {% else %}
+                        <i class="bi bi-file-earmark display-2 text-secondary"></i>
+                    {% endif %}
+                </div>
+
+                <h4 class="text-center mb-4">{{ file.resource.name }}</h4>
+
+                <table class="table table-borderless mb-4">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted" style="width:160px;">Tamanho</td>
+                            <td>{% widthratio file.size_bytes 1024 1 %} KB</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Categoria</td>
+                            <td>{{ file.get_mime_category_display|default:file.mime_category }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Checksum</td>
+                            <td x-data="{ copied: false }" class="d-flex align-items-center gap-2">
+                                <code class="small">{{ file.checksum_sha256|truncatechars:24 }}</code>
+                                <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                        @click="navigator.clipboard.writeText('{{ file.checksum_sha256 }}'); copied = true; setTimeout(() => copied = false, 2000)">
+                                    <i class="bi" :class="copied ? 'bi-check' : 'bi-clipboard'"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Criptografia</td>
+                            <td><span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>AES-256</span></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Enviado por</td>
+                            <td>{{ file.resource.created_by.get_full_name|default:file.resource.created_by.email }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Data de envio</td>
+                            <td>{{ file.resource.created_at|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="d-grid gap-2">
+                    <a href="{% url 'file_download' file.pk %}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-lock me-2"></i>Baixar e Descriptografar
+                    </a>
+                    <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteFileModal">
+                        <i class="bi bi-trash me-2"></i>Excluir arquivo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete modal -->
+        <div class="modal fade" id="deleteFileModal" tabindex="-1">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h6 class="modal-title">Confirmar exclusão</h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        Tem certeza que deseja excluir <strong>{{ file.resource.name }}</strong>? Esta ação não pode ser desfeita.
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <form method="post" action="{% url 'file_delete' file.pk %}">
+                            {% csrf_token %}
+                            <button class="btn btn-sm btn-danger">Excluir</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Access logs -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>Logs de acesso</h6>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Usuário</th>
+                            <th>Ação</th>
+                            <th>IP</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in access_logs %}
+                        <tr>
+                            <td class="small">{{ log.timestamp|date:"d/m/Y H:i" }}</td>
+                            <td class="small">{{ log.user.get_full_name|default:log.user.email }}</td>
+                            <td>
+                                {% if log.action == 'download' %}
+                                    <span class="badge bg-primary">Download</span>
+                                {% elif log.action == 'view' %}
+                                    <span class="badge bg-info text-dark">Visualização</span>
+                                {% elif log.action == 'share' %}
+                                    <span class="badge bg-warning text-dark">Compartilhamento</span>
+                                {% elif log.action == 'upload' %}
+                                    <span class="badge bg-success">Upload</span>
+                                {% elif log.action == 'delete' %}
+                                    <span class="badge bg-danger">Exclusão</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ log.action }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="small text-muted">{{ log.ip_address }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">Nenhum registro de acesso.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="col-lg-4" id="share">
+        <!-- Share card -->
+        <div class="card border-0 shadow-sm mb-4" x-data="{ query: '', permission: 'read' }">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="bi bi-share me-2"></i>Compartilhar</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'file_share' file.pk %}">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <input type="text" name="user_query" class="form-control form-control-sm"
+                               placeholder="Buscar usuário por nome ou email..." x-model="query">
+                    </div>
+                    <div class="mb-3">
+                        <select name="permission" class="form-select form-select-sm" x-model="permission">
+                            <option value="read">Leitura</option>
+                            <option value="write">Edição</option>
+                            <option value="owner">Proprietário</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm w-100" :disabled="!query.trim()">
+                        <i class="bi bi-person-plus me-1"></i>Compartilhar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Users with access -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="bi bi-people me-2"></i>Usuários com acesso</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for su in shared_users %}
+                <li class="list-group-item d-flex align-items-center gap-3">
+                    <span class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                          style="width:36px;height:36px;font-size:14px;">
+                        {{ su.user.first_name|default:"U"|first|upper }}
+                    </span>
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-medium small text-truncate">{{ su.user.get_full_name|default:su.user.email }}</div>
+                        <span class="badge {% if su.user == file.created_by %}bg-danger{% else %}bg-secondary{% endif %} small">
+                            {% if su.user == file.created_by %}Proprietário{% else %}Leitura{% endif %}
+                        </span>
+                    </div>
+                    {% if su.user != file.created_by %}
+                    <form method="post" action="{% url 'file_unshare' file.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="user_id" value="{{ su.user.pk }}">
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Remover acesso">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% empty %}
+                <li class="list-group-item text-center text-muted py-3 small">
+                    Nenhum compartilhamento ativo.
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

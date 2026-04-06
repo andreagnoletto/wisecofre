@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações — Wisecofre{% endblock %}
+{% block page_title %}Configurações{% endblock %}
+
+{% block content %}
+<div x-data="settingsPage()">
+    <ul class="nav nav-tabs mb-4">
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'geral' }" @click="tab = 'geral'">Geral</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'seguranca' }" @click="tab = 'seguranca'">Segurança</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'email' }" @click="tab = 'email'">
+                Email <span class="badge bg-warning text-dark ms-1" title="Requer servidor SMTP externo para teste completo">não testado</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'storage' }" @click="tab = 'storage'">Storage</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'ldap' }" @click="tab = 'ldap'">
+                LDAP <span class="badge bg-warning text-dark ms-1" title="Requer servidor LDAP externo para teste completo">não testado</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" :class="{ active: tab === 'sso' }" @click="tab = 'sso'">
+                SSO <span class="badge bg-warning text-dark ms-1" title="Requer provedor OAuth/OIDC externo para teste completo">não testado</span>
+            </button>
+        </li>
+    </ul>
+
+    <form method="post" action="{% url 'admin_settings' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="save_configs">
+
+        <!-- Geral -->
+        <div x-show="tab === 'geral'" x-transition>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Configurações Gerais</h5></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome da Aplicação</label>
+                            <input type="text" class="form-control" name="APP_NAME" value="{{ configs.APP_NAME }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">URL Base</label>
+                            <input type="url" class="form-control" name="APP_BASE_URL" value="{{ configs.APP_BASE_URL }}" placeholder="https://wisecofre.example.com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Registro aberto</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="REGISTRATION_OPEN" id="regOpen"
+                                       {% if configs.REGISTRATION_OPEN %}checked{% endif %}>
+                                <label class="form-check-label" for="regOpen">Permitir novos registros</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Timeout da Sessão (minutos)</label>
+                            <input type="number" class="form-control" name="SESSION_TIMEOUT_MINUTES" value="{{ configs.SESSION_TIMEOUT_MINUTES }}" min="5">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Segurança -->
+        <div x-show="tab === 'seguranca'" x-transition style="display:none;">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Segurança</h5></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Política MFA</label>
+                            <select class="form-select" name="MFA_POLICY">
+                                <option value="OPTIONAL" {% if configs.MFA_POLICY == "OPTIONAL" %}selected{% endif %}>Opcional</option>
+                                <option value="REQUIRED" {% if configs.MFA_POLICY == "REQUIRED" %}selected{% endif %}>Obrigatório</option>
+                                <option value="DISABLED" {% if configs.MFA_POLICY == "DISABLED" %}selected{% endif %}>Desabilitado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Política de Recuperação de Conta</label>
+                            <select class="form-select" name="ACCOUNT_RECOVERY_POLICY">
+                                <option value="EMAIL" {% if configs.ACCOUNT_RECOVERY_POLICY == "EMAIL" %}selected{% endif %}>Via Email</option>
+                                <option value="ADMIN" {% if configs.ACCOUNT_RECOVERY_POLICY == "ADMIN" %}selected{% endif %}>Somente Admin</option>
+                                <option value="DISABLED" {% if configs.ACCOUNT_RECOVERY_POLICY == "DISABLED" %}selected{% endif %}>Desabilitado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Senha — Tamanho Mínimo</label>
+                            <input type="number" class="form-control" name="PASSWORD_MIN_LENGTH" value="{{ configs.PASSWORD_MIN_LENGTH }}" min="8">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Senha — Entropia Mínima (bits)</label>
+                            <input type="number" class="form-control" name="PASSWORD_MIN_ENTROPY" value="{{ configs.PASSWORD_MIN_ENTROPY }}" min="20">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email -->
+        <div x-show="tab === 'email'" x-transition style="display:none;">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Configurações de Email</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Não testado efetivamente.</strong> Requer servidor SMTP externo. As configurações são salvas mas o envio de email depende de infraestrutura externa.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome do Remetente</label>
+                            <input type="text" class="form-control" name="EMAIL_SENDER_NAME" value="{{ configs.EMAIL_SENDER_NAME }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email do Remetente</label>
+                            <input type="email" class="form-control" name="EMAIL_SENDER_ADDRESS" value="{{ configs.EMAIL_SENDER_ADDRESS }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Host</label>
+                            <input type="text" class="form-control" name="SMTP_HOST" value="{{ configs.SMTP_HOST }}" placeholder="smtp.example.com">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">SMTP Port</label>
+                            <input type="number" class="form-control" name="SMTP_PORT" value="{{ configs.SMTP_PORT }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">TLS</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="SMTP_USE_TLS" id="smtpTls"
+                                       {% if configs.SMTP_USE_TLS %}checked{% endif %}>
+                                <label class="form-check-label" for="smtpTls">Usar TLS</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Usuário</label>
+                            <input type="text" class="form-control" name="SMTP_USER" value="{{ configs.SMTP_USER }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SMTP Senha</label>
+                            <input type="password" class="form-control" name="SMTP_PASSWORD" value="{{ configs.SMTP_PASSWORD }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage -->
+        <div x-show="tab === 'storage'" x-transition style="display:none;">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Storage (MinIO / S3)</h5></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label">Endpoint</label>
+                            <input type="text" class="form-control" name="MINIO_ENDPOINT" value="{{ configs.MINIO_ENDPOINT }}" placeholder="minio:9000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Bucket</label>
+                            <input type="text" class="form-control" name="MINIO_BUCKET" value="{{ configs.MINIO_BUCKET }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tamanho Máx. de Arquivo (MB)</label>
+                            <input type="number" class="form-control" name="FILE_MAX_SIZE_MB" value="{{ configs.FILE_MAX_SIZE_MB }}" min="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Quota por Usuário (MB)</label>
+                            <input type="number" class="form-control" name="USER_QUOTA_MB" value="{{ configs.USER_QUOTA_MB }}" min="1">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="testStorage()" :disabled="storageTesting">
+                            <span x-show="!storageTesting"><i class="bi bi-plug me-1"></i> Testar Conexão</span>
+                            <span x-show="storageTesting"><span class="spinner-border spinner-border-sm me-1"></span> Testando...</span>
+                        </button>
+                        <span class="ms-2 small" x-html="storageResult"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LDAP -->
+        <div x-show="tab === 'ldap'" x-transition style="display:none;">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">LDAP</h5></div>
+                <div class="card-body">
+                    <div class="alert alert-warning py-2 small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Não testado efetivamente.</strong> Requer servidor LDAP externo. As configurações são salvas mas a integração depende de infraestrutura externa.
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Ativo</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="LDAP_ENABLED" id="ldapEnabled"
+                                       {% if configs.LDAP_ENABLED %}checked{% endif %}>
+                                <label class="form-check-label" for="ldapEnabled">Habilitar LDAP</label>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Host</label>
+                            <input type="text" class="form-control" name="LDAP_HOST" value="{{ configs.LDAP_HOST }}" placeholder="ldap.example.com">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Porta</label>
+                            <input type="number" class="form-control" name="LDAP_PORT" value="{{ configs.LDAP_PORT }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">TLS</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="LDAP_USE_TLS" id="ldapTls"
+                                       {% if configs.LDAP_USE_TLS %}checked{% endif %}>
+                                <label class="form-check-label" for="ldapTls">TLS</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bind DN</label>
+                            <input type="text" class="form-control" name="LDAP_BIND_DN" value="{{ configs.LDAP_BIND_DN }}" placeholder="cn=admin,dc=example,dc=com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bind Password</label>
+                            <input type="password" class="form-control" name="LDAP_BIND_PASSWORD" value="{{ configs.LDAP_BIND_PASSWORD }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Base DN</label>
+                            <input type="text" class="form-control" name="LDAP_BASE_DN" value="{{ configs.LDAP_BASE_DN }}" placeholder="dc=example,dc=com">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Filtro de Busca</label>
+                            <input type="text" class="form-control" name="LDAP_USER_FILTER" value="{{ configs.LDAP_USER_FILTER }}" placeholder="(objectClass=person)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Intervalo de Sync (minutos)</label>
+                            <input type="number" class="form-control" name="LDAP_SYNC_INTERVAL" value="{{ configs.LDAP_SYNC_INTERVAL }}" min="5">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @click="testLdap()" :disabled="ldapTesting">
+                            <span x-show="!ldapTesting"><i class="bi bi-plug me-1"></i> Testar Conexão</span>
+                            <span x-show="ldapTesting"><span class="spinner-border spinner-border-sm me-1"></span> Testando...</span>
+                        </button>
+                        <span class="ms-2 small" x-html="ldapResult"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save button (for config tabs) -->
+        <div class="mt-4" x-show="tab !== 'sso'" x-transition>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-check-lg me-1"></i> Salvar Configurações
+            </button>
+        </div>
+    </form>
+
+    <!-- SSO (separate form) -->
+    <div x-show="tab === 'sso'" x-transition style="display:none;">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">SSO Providers</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning py-2 small mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Não testado efetivamente.</strong> Requer provedor OAuth/OIDC externo. Os providers são cadastrados mas o fluxo de login SSO depende de infraestrutura externa.
+                </div>
+
+                {% if sso_providers %}
+                <div class="table-responsive mb-4">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tipo</th>
+                                <th>Client ID</th>
+                                <th>Status</th>
+                                <th class="text-end">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in sso_providers %}
+                            <tr>
+                                <td><span class="badge bg-dark">{{ p.get_provider_display }}</span></td>
+                                <td class="text-muted small">{{ p.client_id|truncatechars:30 }}</td>
+                                <td>
+                                    {% if p.is_enabled %}
+                                    <span class="badge bg-success">Ativo</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inativo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form method="post" action="{% url 'admin_sso_delete' p.id %}" class="d-inline"
+                                          onsubmit="return confirm('Remover este provider?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted small">Nenhum provider SSO cadastrado.</p>
+                {% endif %}
+
+                <h6 class="mb-3">Adicionar Provider</h6>
+                <form method="post" action="{% url 'admin_settings' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_sso">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo</label>
+                            <select class="form-select" name="SSO_PROVIDER_TYPE">
+                                <option value="oidc">OpenID Connect</option>
+                                <option value="microsoft">Microsoft / Azure AD</option>
+                                <option value="google">Google</option>
+                                <option value="adfs">ADFS</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Client ID</label>
+                            <input type="text" class="form-control" name="SSO_CLIENT_ID" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Client Secret</label>
+                            <input type="password" class="form-control" name="SSO_CLIENT_SECRET">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tenant ID</label>
+                            <input type="text" class="form-control" name="SSO_TENANT_ID" placeholder="Opcional">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Discovery URL</label>
+                            <input type="url" class="form-control" name="SSO_DISCOVERY_URL" placeholder="https://…/.well-known/openid-configuration">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Ativo</label>
+                            <div class="form-check form-switch mt-1">
+                                <input class="form-check-input" type="checkbox" name="SSO_ENABLED" id="ssoEnabled">
+                                <label class="form-check-label" for="ssoEnabled">Habilitar</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-plus-lg me-1"></i> Adicionar Provider
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function settingsPage() {
+    return {
+        tab: 'geral',
+        storageTesting: false,
+        storageResult: '',
+        ldapTesting: false,
+        ldapResult: '',
+        async testStorage() {
+            this.storageTesting = true;
+            this.storageResult = '';
+            try {
+                const resp = await fetch("{% url 'admin_test_storage' %}", {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+                });
+                this.storageResult = await resp.text();
+            } catch(e) {
+                this.storageResult = '<span class="text-danger"><i class="bi bi-x-circle"></i> Erro de rede</span>';
+            }
+            this.storageTesting = false;
+        },
+        async testLdap() {
+            this.ldapTesting = true;
+            this.ldapResult = '';
+            try {
+                const resp = await fetch("{% url 'admin_test_ldap' %}", {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}
+                });
+                this.ldapResult = await resp.text();
+            } catch(e) {
+                this.ldapResult = '<span class="text-danger"><i class="bi bi-x-circle"></i> Erro de rede</span>';
+            }
+            this.ldapTesting = false;
+        }
+    }
+}
+</script>
+{% endblock %}
