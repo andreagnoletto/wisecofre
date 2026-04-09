@@ -7,6 +7,8 @@ build/
 venv/
 *.sqlite3
 .env
+.env.*
+!.env.example
 *.log
 staticfiles/
 media/
