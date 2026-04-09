@@ -1,19 +1,19 @@
 x-django-env: &django-env
-  SECRET_KEY: ${SECRET_KEY}
+  SECRET_KEY: ${SECRET_KEY:-wc-s3cr3t-k3y-ch4ng3-m3-1n-pr0duct10n-2026}
   DEBUG: ${DEBUG:-False}
   DJANGO_SETTINGS_MODULE: config.settings.production
   ALLOWED_HOSTS: ${ALLOWED_HOSTS:-cofre.wisedoc.com.br}
-  DATABASE_URL: ${DATABASE_URL}
-  REDIS_URL: ${REDIS_URL}
-  CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://wisecofre:wc-db-p4ss-2026@db:5432/wisecofre}
+  REDIS_URL: ${REDIS_URL:-redis://:wc-r3d1s-p4ss-2026@redis:6379/0}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://:wc-r3d1s-p4ss-2026@redis:6379/1}
   MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
   MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-wisecofre-files}
   MINIO_USE_HTTPS: ${MINIO_USE_HTTPS:-False}
   APP_BASE_URL: ${APP_BASE_URL:-https://cofre.wisedoc.com.br}
   APP_NAME: ${APP_NAME:-Wisecofre}
-  ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-wc-encr1pt10n-k3y-ch4ng3-m3-2026}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://cofre.wisedoc.com.br}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://cofre.wisedoc.com.br}
   SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
@@ -59,7 +59,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wisecofre}
       POSTGRES_USER: ${POSTGRES_USER:-wisecofre}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wc-db-p4ss-2026}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -73,9 +73,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD:-wc-r3d1s-p4ss-2026}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-wc-r3d1s-p4ss-2026}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -144,8 +144,8 @@ services:
       echo 'Bucket pronto.';
       "
     environment:
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
       MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-wisecofre-files}
     networks:
       - wisecofre
