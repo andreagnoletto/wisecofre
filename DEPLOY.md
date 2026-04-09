@@ -21,7 +21,22 @@ O deploy usa `docker/docker-compose.prod.yml` que sobe todos os servicos:
 - Docker Compose Location: `docker/docker-compose.prod.yml`
 - Build Context: raiz do repositorio (`.`)
 
-### 2. Variaveis de ambiente
+### 2. Configurar dominios dos servicos
+
+O Coolify solicita um dominio para cada servico do Docker Compose. **Apenas o nginx precisa de dominio publico**, pois e o reverse proxy que recebe todo o trafego externo. Os demais servicos se comunicam internamente via rede Docker e nao precisam de dominio.
+
+| Servico | Dominio | Motivo |
+|---|---|---|
+| **nginx** | `https://wisecofre.wisedoc.com.br` | Unico ponto de entrada publico (reverse proxy) |
+| **web** | *(deixar vazio)* | Acessado internamente pelo nginx, nao recebe trafego externo |
+| **celery** | *(deixar vazio)* | Worker interno, nao recebe trafego HTTP |
+| **celery-beat** | *(deixar vazio)* | Scheduler interno, nao recebe trafego HTTP |
+| **minio** | *(deixar vazio)* | Storage interno entre containers — opcionalmente `https://minio.wisecofre.wisedoc.com.br` se quiser acesso externo ao console |
+| **minio-init** | *(deixar vazio)* | Job de inicializacao, roda uma vez e para |
+
+> **Resumo:** Preencha dominio apenas para o **nginx**. Os campos dos demais servicos podem ficar em branco.
+
+### 3. Variaveis de ambiente
 
 Configurar as seguintes variaveis no Coolify:
 
@@ -79,14 +94,14 @@ MINIO_PRESIGNED_URL_EXPIRY_SECONDS=60
 MINIO_UPLOAD_URL_EXPIRY_SECONDS=900
 ```
 
-### 3. Dominio
+### 4. Dominio
 
 - Configurar dominio `wisecofre.wisedoc.com.br` no Coolify
 - Apontar DNS (A record) para o IP do servidor Coolify
 - Habilitar SSL automatico (Let's Encrypt)
 - Porta exposta: **80** (do nginx)
 
-### 4. Notas importantes
+### 5. Notas importantes
 
 - `SECURE_SSL_REDIRECT=False` porque o Coolify/Traefik ja faz o redirect HTTPS
 - `MINIO_ENDPOINT=minio:9000` usa o nome do servico Docker (interno)
@@ -94,7 +109,7 @@ MINIO_UPLOAD_URL_EXPIRY_SECONDS=900
 - O bucket e criado automaticamente pelo `entrypoint.sh`
 - O `collectstatic` roda automaticamente no entrypoint
 
-### 5. Criar usuario admin apos deploy
+### 6. Criar usuario admin apos deploy
 
 ```bash
 docker compose exec web python manage.py createsuperuser
