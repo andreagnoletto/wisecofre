@@ -44,8 +44,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    networks:
-      - wisecofre
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8003/login/"]
@@ -67,8 +65,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - wisecofre
     restart: always
 
   redis:
@@ -79,8 +75,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - wisecofre
     restart: always
 
   celery:
@@ -95,8 +89,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - wisecofre
     restart: always
 
   celery-beat:
@@ -111,8 +103,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - wisecofre
     restart: always
 
   minio:
@@ -128,8 +118,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - wisecofre
     restart: always
 
   minio-init:
@@ -147,13 +135,7 @@ services:
       MC_ROOT_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
       MC_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
       MC_BUCKET: ${MINIO_BUCKET_NAME:-wisecofre-files}
-    networks:
-      - wisecofre
 
 volumes:
   pgdata:
   miniodata:
-
-networks:
-  wisecofre:
-    driver: bridge
