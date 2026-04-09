@@ -2,7 +2,7 @@
 
 ## Arquitetura
 
-O deploy usa `docker/docker-compose.prod.yml` que sobe todos os servicos:
+O deploy usa `docker-compose.prod.yml` que sobe todos os servicos:
 
 - **nginx** - Reverse proxy (porta 80)
 - **web** - Django/Gunicorn
@@ -18,7 +18,7 @@ O deploy usa `docker/docker-compose.prod.yml` que sobe todos os servicos:
 
 - Tipo: **Docker Compose**
 - Repositorio: apontar para o repo Git
-- Docker Compose Location: `docker/docker-compose.prod.yml`
+- Docker Compose Location: `docker-compose.prod.yml`
 - Build Context: raiz do repositorio (`.`)
 
 ### 2. Variaveis de ambiente
