@@ -32,7 +32,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     environment:
       <<: *django-env
     expose:
@@ -86,7 +86,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     command: celery -A config worker -l warning --concurrency=4
     environment:
       <<: *django-env
@@ -102,7 +102,7 @@ services:
   celery-beat:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
     command: celery -A config beat -l warning --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
       <<: *django-env
@@ -119,8 +119,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
     volumes:
       - miniodata:/data
     healthcheck:

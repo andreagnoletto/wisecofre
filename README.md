@@ -73,7 +73,8 @@ wisecofre/
 │   ├── resources/    # Senhas, secrets, tags
 │   └── sharing/      # Permissoes, compartilhamento
 ├── config/           # Settings, URLs, WSGI
-├── docker/           # Dockerfile, entrypoint
+├── Dockerfile        # Imagem Docker
+├── entrypoint.sh     # Entrypoint do container
 ├── templates/        # Django templates
 ├── tests/            # E2E Playwright
 ├── docker-compose.yml       # Dev local (infra)
