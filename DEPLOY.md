@@ -1,67 +1,79 @@
 # Deploy Wisecofre no Coolify
 
-## Arquitetura
+## Arquitetura de Producao
 
-O deploy usa `docker-compose.prod.yml` que sobe todos os servicos:
+```
+Internet -> Coolify Traefik (TLS) -> web:8000 (Gunicorn/Django)
+                                        |
+                              +---------+---------+
+                              |         |         |
+                             db      redis     minio
+                          (Postgres) (Cache)  (Storage)
+                              |
+                     +--------+--------+
+                     |                 |
+                   celery         celery-beat
+                  (Worker)       (Scheduler)
+```
 
-- **nginx** - Reverse proxy (porta 80)
-- **web** - Django/Gunicorn
-- **db** - PostgreSQL 16
-- **redis** - Redis 7
-- **celery** - Worker Celery
-- **celery-beat** - Scheduler Celery
-- **minio** - Object storage (S3-compatible)
+Servicos no `docker-compose.prod.yml`:
 
-## Configuracao no Coolify
+| Servico | Funcao |
+|---|---|
+| **web** | Django/Gunicorn (porta 8000) |
+| **db** | PostgreSQL 16 |
+| **redis** | Cache + Celery broker |
+| **celery** | Worker async |
+| **celery-beat** | Scheduler de tarefas |
+| **minio** | Object storage S3-compatible |
+| **minio-init** | Cria bucket (roda uma vez) |
 
-### 1. Criar novo recurso
+## Passo a passo no Coolify
+
+### 1. Criar recurso
 
 - Tipo: **Docker Compose**
-- Repositorio: apontar para o repo Git
+- Repositorio: `https://github.com/andreagnoletto/wisecofre`
+- Branch: `main`
 - Docker Compose Location: `docker-compose.prod.yml`
-- Build Context: raiz do repositorio (`.`)
 
-### 2. Configurar dominios dos servicos
+### 2. Configurar dominio
 
-O Coolify solicita um dominio para cada servico do Docker Compose. **Apenas o nginx precisa de dominio publico**, pois e o reverse proxy que recebe todo o trafego externo. Os demais servicos se comunicam internamente via rede Docker e nao precisam de dominio.
+Na configuracao do recurso no Coolify:
 
-| Servico | Dominio | Motivo |
+| Servico | Dominio | Porta |
 |---|---|---|
-| **nginx** | `https://wisecofre.wisedoc.com.br` | Unico ponto de entrada publico (reverse proxy) |
-| **web** | *(deixar vazio)* | Acessado internamente pelo nginx, nao recebe trafego externo |
-| **celery** | *(deixar vazio)* | Worker interno, nao recebe trafego HTTP |
-| **celery-beat** | *(deixar vazio)* | Scheduler interno, nao recebe trafego HTTP |
-| **minio** | *(deixar vazio)* | Storage interno entre containers — opcionalmente `https://minio.wisecofre.wisedoc.com.br` se quiser acesso externo ao console |
-| **minio-init** | *(deixar vazio)* | Job de inicializacao, roda uma vez e para |
+| **web** | `https://wisecofre.wisedoc.com.br` | `8000` |
+| demais | *(vazio)* | - |
 
-> **Resumo:** Preencha dominio apenas para o **nginx**. Os campos dos demais servicos podem ficar em branco.
+> O Traefik do Coolify faz TLS + reverse proxy para o `web:8000`.
 
 ### 3. Variaveis de ambiente
 
-Configurar as seguintes variaveis no Coolify:
+Configurar no Coolify (Environment Variables):
 
 ```env
 # Django
-SECRET_KEY=gerar-com-python-c-"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+SECRET_KEY=<gerar: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())">
 DEBUG=False
 DJANGO_SETTINGS_MODULE=config.settings.production
 ALLOWED_HOSTS=wisecofre.wisedoc.com.br
 
-# Database (interno entre containers)
+# Database (hosts internos Docker)
 DATABASE_URL=postgresql://wisecofre:SENHA_SEGURA_DB@db:5432/wisecofre
 POSTGRES_DB=wisecofre
 POSTGRES_USER=wisecofre
 POSTGRES_PASSWORD=SENHA_SEGURA_DB
 
-# Redis (interno entre containers)
+# Redis
 REDIS_URL=redis://:SENHA_SEGURA_REDIS@redis:6379/0
 REDIS_PASSWORD=SENHA_SEGURA_REDIS
 CELERY_BROKER_URL=redis://:SENHA_SEGURA_REDIS@redis:6379/1
 
-# MinIO (interno entre containers)
+# MinIO
 MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=GERAR_ACCESS_KEY_SEGURA
-MINIO_SECRET_KEY=GERAR_SECRET_KEY_SEGURA_LONGA
+MINIO_ACCESS_KEY=GERAR_ACCESS_KEY
+MINIO_SECRET_KEY=GERAR_SECRET_KEY_LONGA
 MINIO_BUCKET_NAME=wisecofre-files
 MINIO_USE_HTTPS=False
 
@@ -73,10 +85,10 @@ APP_NAME=Wisecofre
 CSRF_TRUSTED_ORIGINS=https://wisecofre.wisedoc.com.br
 CORS_ALLOWED_ORIGINS=https://wisecofre.wisedoc.com.br
 
-# SSL (Coolify gerencia via Traefik/Caddy)
+# SSL (Coolify/Traefik gerencia)
 SECURE_SSL_REDIRECT=False
 
-# Email (configurar SMTP real)
+# Email (ajustar para SMTP real)
 EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp.seuservidor.com
 EMAIL_PORT=587
@@ -84,48 +96,56 @@ EMAIL_USE_TLS=True
 DEFAULT_FROM_EMAIL=noreply@wisecofre.wisedoc.com.br
 
 # Seguranca
-ENCRYPTION_KEY=gerar-com-python-c-"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=<gerar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
 JWT_ACCESS_TOKEN_LIFETIME_MINUTES=30
 JWT_REFRESH_TOKEN_LIFETIME_DAYS=7
 
 # Limites
 FILE_MAX_SIZE_BYTES=10485760
-MINIO_PRESIGNED_URL_EXPIRY_SECONDS=60
-MINIO_UPLOAD_URL_EXPIRY_SECONDS=900
 ```
 
-### 4. Dominio
+### 4. DNS
 
-- Configurar dominio `wisecofre.wisedoc.com.br` no Coolify
-- Apontar DNS (A record) para o IP do servidor Coolify
-- Habilitar SSL automatico (Let's Encrypt)
-- Porta exposta: **80** (do nginx)
+- Apontar `wisecofre.wisedoc.com.br` (A record) para o IP do servidor Coolify
+- SSL automatico via Let's Encrypt (habilitado no Coolify)
 
-### 5. Notas importantes
+### 5. Deploy
 
-- `SECURE_SSL_REDIRECT=False` porque o Coolify/Traefik ja faz o redirect HTTPS
-- `MINIO_ENDPOINT=minio:9000` usa o nome do servico Docker (interno)
-- `MINIO_USE_HTTPS=False` porque a comunicacao MinIO e interna entre containers
-- O bucket e criado automaticamente pelo `entrypoint.sh`
-- O `collectstatic` roda automaticamente no entrypoint
+Clicar em **Deploy** no Coolify. O processo:
 
-### 6. Criar usuario admin apos deploy
+1. Builda a imagem Docker
+2. Sobe db, redis, minio (aguarda healthchecks)
+3. `minio-init` cria o bucket
+4. `entrypoint.sh` do web: aguarda DB, roda migrations, collectstatic
+5. Gunicorn inicia na porta 8000
+6. Celery e celery-beat iniciam
+
+### 6. Criar usuario admin
+
+Apos o primeiro deploy, executar no terminal do Coolify (ou SSH no servidor):
 
 ```bash
-docker compose exec web python manage.py createsuperuser
+docker exec -it <container-web> python manage.py createsuperuser
 ```
 
-## Dev Local
+### Notas
 
-Para desenvolvimento local, use o `docker-compose.yml` da raiz (somente infra):
+- `SECURE_SSL_REDIRECT=False` — Traefik do Coolify ja redireciona HTTP->HTTPS
+- `MINIO_ENDPOINT=minio:9000` — comunicacao interna Docker (sem HTTPS)
+- O bucket e criado automaticamente pelo servico `minio-init`
+- Migrations e collectstatic rodam automaticamente no entrypoint
+- Whitenoise serve arquivos estaticos (nao precisa nginx)
+
+## Dev Local
 
 ```bash
 # Subir infra (PostgreSQL + Redis + MinIO)
 docker compose up -d
 
-# Rodar Django localmente
+# Instalar dependencias e rodar Django
+uv sync
 uv run python manage.py migrate
 uv run python manage.py runserver
 ```
 
-O MinIO console fica acessivel em `http://localhost:9001` (user: `wisecofre-access-key`, pass: `wisecofre-secret-key-muito-longa`).
+MinIO console: `http://localhost:9001` (user: `wisecofre-access-key`)
