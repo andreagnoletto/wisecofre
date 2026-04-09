@@ -43,7 +43,7 @@ Na configuracao do recurso no Coolify:
 
 | Servico | Dominio | Porta |
 |---|---|---|
-| **web** | `https://wisecofre.wisedoc.com.br` | `8000` |
+| **web** | `https://cofre.wisedoc.com.br` | `8000` |
 | demais | *(vazio)* | - |
 
 > O Traefik do Coolify faz TLS + reverse proxy para o `web:8000`.
@@ -57,7 +57,7 @@ Configurar no Coolify (Environment Variables):
 SECRET_KEY=<gerar: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())">
 DEBUG=False
 DJANGO_SETTINGS_MODULE=config.settings.production
-ALLOWED_HOSTS=wisecofre.wisedoc.com.br
+ALLOWED_HOSTS=cofre.wisedoc.com.br
 
 # Database (hosts internos Docker)
 DATABASE_URL=postgresql://wisecofre:SENHA_SEGURA_DB@db:5432/wisecofre
@@ -78,12 +78,12 @@ MINIO_BUCKET_NAME=wisecofre-files
 MINIO_USE_HTTPS=False
 
 # App
-APP_BASE_URL=https://wisecofre.wisedoc.com.br
+APP_BASE_URL=https://cofre.wisedoc.com.br
 APP_NAME=Wisecofre
 
 # CSRF / CORS
-CSRF_TRUSTED_ORIGINS=https://wisecofre.wisedoc.com.br
-CORS_ALLOWED_ORIGINS=https://wisecofre.wisedoc.com.br
+CSRF_TRUSTED_ORIGINS=https://cofre.wisedoc.com.br
+CORS_ALLOWED_ORIGINS=https://cofre.wisedoc.com.br
 
 # SSL (Coolify/Traefik gerencia)
 SECURE_SSL_REDIRECT=False
@@ -93,7 +93,7 @@ EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 EMAIL_HOST=smtp.seuservidor.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=True
-DEFAULT_FROM_EMAIL=noreply@wisecofre.wisedoc.com.br
+DEFAULT_FROM_EMAIL=noreply@cofre.wisedoc.com.br
 
 # Seguranca
 ENCRYPTION_KEY=<gerar: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
@@ -106,7 +106,7 @@ FILE_MAX_SIZE_BYTES=10485760
 
 ### 4. DNS
 
-- Apontar `wisecofre.wisedoc.com.br` (A record) para o IP do servidor Coolify
+- Apontar `cofre.wisedoc.com.br` (A record) para o IP do servidor Coolify
 - SSL automatico via Let's Encrypt (habilitado no Coolify)
 
 ### 5. Deploy
