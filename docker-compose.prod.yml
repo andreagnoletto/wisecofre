@@ -5,10 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-    expose:
-      - "8000"
-    volumes:
-      - staticfiles:/app/staticfiles
+    ports:
+      - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
@@ -25,20 +23,6 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
-
-  nginx:
-    build:
-      context: .
-      dockerfile: docker/nginx/Dockerfile
-    ports:
-      - "80:80"
-    volumes:
-      - staticfiles:/app/staticfiles:ro
-    depends_on:
-      - web
-    networks:
-      - wisecofre
-    restart: always
 
   db:
     image: postgres:16-alpine
@@ -139,7 +123,6 @@ services:
 volumes:
   pgdata:
   miniodata:
-  staticfiles:
 
 networks:
   wisecofre:
