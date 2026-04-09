@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
