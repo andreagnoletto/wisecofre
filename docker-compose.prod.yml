@@ -36,7 +36,7 @@ services:
     environment:
       <<: *django-env
     expose:
-      - "8000"
+      - "8003"
     depends_on:
       db:
         condition: service_healthy
@@ -48,7 +48,7 @@ services:
       - wisecofre
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:8000/login/"]
+      test: ["CMD", "curl", "-sf", "http://localhost:8003/login/"]
       interval: 30s
       timeout: 10s
       retries: 5

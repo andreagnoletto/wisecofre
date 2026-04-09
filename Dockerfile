@@ -16,7 +16,7 @@ COPY . .
 
 RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
-EXPOSE 8000
+EXPOSE 8003
 
 ENTRYPOINT ["./entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8003", "--workers", "4"]
