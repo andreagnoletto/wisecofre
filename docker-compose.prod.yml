@@ -15,7 +15,7 @@ x-django-env: &django-env
   APP_NAME: ${APP_NAME:-Wisecofre}
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:-placeholder}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
-  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://cofre.wisedoc.com.br}
   SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
   EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
   EMAIL_HOST: ${EMAIL_HOST:-localhost}
