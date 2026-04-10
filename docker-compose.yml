@@ -1,36 +1,80 @@
+x-django-env: &django-env
+  SECRET_KEY: ${SECRET_KEY:-wc-s3cr3t-k3y-ch4ng3-m3-1n-pr0duct10n-2026}
+  DEBUG: ${DEBUG:-False}
+  DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-cofre.wisedoc.com.br,localhost,127.0.0.1}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://wisecofre:wc-db-p4ss-2026@db:5432/wisecofre}
+  MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
+  MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-wisecofre-files}
+  MINIO_USE_HTTPS: ${MINIO_USE_HTTPS:-False}
+  APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8003}
+  APP_NAME: ${APP_NAME:-Wisecofre}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-wc-encr1pt10n-k3y-ch4ng3-m3-2026}
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8003,https://cofre.wisedoc.com.br}
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8003,https://cofre.wisedoc.com.br}
+  SECURE_SSL_REDIRECT: ${SECURE_SSL_REDIRECT:-False}
+  EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.console.EmailBackend}
+  EMAIL_HOST: ${EMAIL_HOST:-localhost}
+  EMAIL_PORT: ${EMAIL_PORT:-587}
+  EMAIL_USE_TLS: ${EMAIL_USE_TLS:-False}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@cofre.wisedoc.com.br}
+  JWT_ACCESS_TOKEN_LIFETIME_MINUTES: ${JWT_ACCESS_TOKEN_LIFETIME_MINUTES:-30}
+  JWT_REFRESH_TOKEN_LIFETIME_DAYS: ${JWT_REFRESH_TOKEN_LIFETIME_DAYS:-7}
+  FILE_MAX_SIZE_BYTES: ${FILE_MAX_SIZE_BYTES:-10485760}
+  MINIO_PRESIGNED_URL_EXPIRY_SECONDS: ${MINIO_PRESIGNED_URL_EXPIRY_SECONDS:-60}
+  MINIO_UPLOAD_URL_EXPIRY_SECONDS: ${MINIO_UPLOAD_URL_EXPIRY_SECONDS:-900}
+
 services:
+  web:
+    build: .
+    environment:
+      <<: *django-env
+    ports:
+      - "8003:8003"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8003/login/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
   db:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
     environment:
-      POSTGRES_DB: wisecofre
-      POSTGRES_USER: wisecofre
-      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ${POSTGRES_DB:-wisecofre}
+      POSTGRES_USER: ${POSTGRES_USER:-wisecofre}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wc-db-p4ss-2026}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wisecofre"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wisecofre}"]
       interval: 5s
-      timeout: 3s
+      timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     environment:
-      MINIO_ROOT_USER: wisecofre-access-key
-      MINIO_ROOT_PASSWORD: wisecofre-secret-key-muito-longa
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
     volumes:
       - miniodata:/data
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 3s
+      interval: 10s
+      timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   minio-init:
     image: minio/mc:latest
@@ -39,10 +83,14 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 wisecofre-access-key wisecofre-secret-key-muito-longa;
-      mc mb --ignore-existing local/wisecofre-files;
-      echo 'Bucket wisecofre-files pronto.';
+      mc alias set local http://minio:9000 $${MC_USER} $${MC_PASS};
+      mc mb --ignore-existing local/$${MC_BUCKET:-wisecofre-files};
+      echo 'Bucket pronto.';
       "
+    environment:
+      MC_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
+      MC_PASS: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
+      MC_BUCKET: ${MINIO_BUCKET_NAME:-wisecofre-files}
 
 volumes:
   pgdata:
