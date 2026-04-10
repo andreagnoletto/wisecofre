@@ -11,7 +11,6 @@ class HealthCheckView(APIView):
         checks = {}
         healthy = True
 
-        # Database
         try:
             connection.ensure_connection()
             checks["database"] = "ok"
@@ -19,32 +18,6 @@ class HealthCheckView(APIView):
             checks["database"] = str(e)
             healthy = False
 
-        # Redis
-        try:
-            from django_redis import get_redis_connection
-
-            conn = get_redis_connection("default")
-            conn.ping()
-            checks["redis"] = "ok"
-        except Exception as e:
-            checks["redis"] = str(e)
-            healthy = False
-
-        # Celery
-        try:
-            from celery import current_app
-
-            insp = current_app.control.inspect(timeout=2)
-            if insp.ping():
-                checks["celery"] = "ok"
-            else:
-                checks["celery"] = "no workers responding"
-                healthy = False
-        except Exception as e:
-            checks["celery"] = str(e)
-            healthy = False
-
-        # MinIO / S3
         try:
             import boto3
             from django.conf import settings
