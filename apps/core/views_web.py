@@ -306,11 +306,31 @@ def folder_detail(request, pk):
             messages.error(request, str(e.message if hasattr(e, "message") else e))
         return redirect("folder_detail", pk=pk)
     resources = Resource.objects.filter(folder=folder, deleted_at__isnull=True)
+    user = request.user
+
+    password_ids = set(Secret.objects.filter(user=user).values_list("resource_id", flat=True))
+    file_resource_ids = set(
+        FileSecret.objects.filter(user=user)
+        .values_list("file_resource__resource_id", flat=True)
+    )
+    if user.is_staff:
+        passwords = resources.filter(resource_type__slug="password")
+        file_resources = FileResource.objects.filter(
+            resource__folder=folder, resource__deleted_at__isnull=True, deleted_at__isnull=True,
+        ).select_related("resource")
+    else:
+        passwords = resources.filter(pk__in=password_ids, resource_type__slug="password")
+        file_resources = FileResource.objects.filter(
+            resource__folder=folder, resource__deleted_at__isnull=True, deleted_at__isnull=True,
+            pk__in=FileSecret.objects.filter(user=user).values_list("file_resource_id", flat=True),
+        ).select_related("resource")
+
     children = Folder.objects.filter(parent=folder, deleted_at__isnull=True)
     all_folders = Folder.objects.filter(deleted_at__isnull=True)
     return render(request, "folders/list.html", {
         "folders": children, "current_folder": folder,
-        "resources": resources, "all_folders": all_folders,
+        "passwords": passwords, "file_resources": file_resources,
+        "all_folders": all_folders,
     })
 
 

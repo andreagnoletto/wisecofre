@@ -1020,6 +1020,239 @@ def test_mfa_login_normal_after_disable(page: Page):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# TEXT FILE CREATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_text_file_create(page: Page):
+    _login_and_go(page, "/files/new/")
+    page.fill('input[name="name"]', f"notas-{UNIQUE}")
+    page.fill('textarea[name="content"]', f"Conteudo secreto {UNIQUE}")
+    with page.expect_navigation():
+        page.get_by_role("button", name="Criar Arquivo").click()
+    expect(page.locator(".alert-success")).to_be_visible()
+    expect(page.locator("h4", has_text=f"notas-{UNIQUE}.txt")).to_be_visible()
+
+
+def test_text_file_in_list(page: Page):
+    _login_and_go(page, "/files/")
+    expect(page.get_by_role("link", name=f"notas-{UNIQUE}.txt").first).to_be_visible()
+
+
+def test_text_file_download_content(page: Page):
+    _login_and_go(page, "/files/")
+    page.get_by_role("link", name=f"notas-{UNIQUE}.txt").first.click()
+    with page.expect_download() as dl:
+        page.get_by_role("link", name=re.compile("Baixar|Download|descriptografar", re.IGNORECASE)).first.click()
+    content = open(dl.value.path(), "r", encoding="utf-8").read()
+    assert f"Conteudo secreto {UNIQUE}" in content
+
+
+def test_text_file_empty_name_error(page: Page):
+    """Submitting with empty name should show error, not 500."""
+    _login_and_go(page, "/files/new/")
+    page.fill('textarea[name="content"]', "some content")
+    page.get_by_role("button", name="Criar Arquivo").click()
+    # HTML5 required validation prevents submit — still on same page
+    expect(page).to_have_url(re.compile(r"/files/new/"))
+
+
+def test_text_file_empty_content_error(page: Page):
+    """Submitting with empty content should show error, not 500."""
+    _login_and_go(page, "/files/new/")
+    page.fill('input[name="name"]', "empty-test")
+    page.get_by_role("button", name="Criar Arquivo").click()
+    expect(page).to_have_url(re.compile(r"/files/new/"))
+
+
+def test_text_file_new_button_on_list(page: Page):
+    """'Novo Texto' button should be visible on file list."""
+    _login_and_go(page, "/files/")
+    expect(page.get_by_role("link", name="Novo Texto")).to_be_visible()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FOLDER ERROR HANDLING
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_folder_duplicate_name_shows_error(page: Page):
+    """Creating a folder with an existing name should show error, not 500."""
+    _login_and_go(page, "/folders/")
+    # Create first folder
+    page.locator('[data-bs-target="#createFolderModal"]').first.click()
+    page.wait_for_selector("#createFolderModal.show", state="visible")
+    page.fill("#folderName", f"DupTest-{UNIQUE}")
+    with page.expect_navigation():
+        page.click('#createFolderModal button[type="submit"]')
+    expect(page.locator(".list-group-item", has_text=f"DupTest-{UNIQUE}").first).to_be_visible()
+    # Try creating same name again
+    page.locator('[data-bs-target="#createFolderModal"]').first.click()
+    page.wait_for_selector("#createFolderModal.show", state="visible")
+    page.fill("#folderName", f"DupTest-{UNIQUE}")
+    with page.expect_navigation():
+        page.click('#createFolderModal button[type="submit"]')
+    expect(page.locator(".alert-danger, .alert-error")).to_be_visible()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FOLDER + FILE INTEGRATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_file_upload_to_folder(page: Page, tmp_path):
+    """Upload a file to a specific folder."""
+    _login_and_go(page, "/files/upload/")
+    f = tmp_path / f"infolder-{UNIQUE}.txt"
+    f.write_text("file inside folder")
+    page.locator('input[name="file"]').set_input_files(str(f))
+    page.select_option('select[name="folder"]', label=f"Pasta {UNIQUE}")
+    with page.expect_navigation():
+        page.get_by_role("button", name=re.compile("Enviar")).click()
+    expect(page.locator(".alert-success")).to_be_visible()
+
+
+def test_file_visible_in_folder_detail(page: Page):
+    """File uploaded to folder should be visible when browsing that folder."""
+    _login_and_go(page, "/folders/")
+    page.locator(".list-group-item", has_text=f"Pasta {UNIQUE}").first.click()
+    page.wait_for_load_state("domcontentloaded")
+    expect(page.get_by_text(f"infolder-{UNIQUE}.txt")).to_be_visible()
+
+
+def test_file_in_folder_links_to_file_detail(page: Page):
+    """Clicking a file inside a folder should go to file detail, not password detail."""
+    _login_and_go(page, "/folders/")
+    page.locator(".list-group-item", has_text=f"Pasta {UNIQUE}").first.click()
+    page.wait_for_load_state("domcontentloaded")
+    page.get_by_text(f"infolder-{UNIQUE}.txt").click()
+    page.wait_for_load_state("domcontentloaded")
+    # Should be on file detail, not a permission error
+    expect(page.locator("h4", has_text=f"infolder-{UNIQUE}.txt")).to_be_visible()
+
+
+def test_text_file_create_in_folder(page: Page):
+    """Create a text file directly inside a folder."""
+    _login_and_go(page, "/files/new/")
+    page.fill('input[name="name"]', f"texto-pasta-{UNIQUE}")
+    page.fill('textarea[name="content"]', "conteudo na pasta")
+    page.select_option('select[name="folder"]', label=f"Pasta {UNIQUE}")
+    with page.expect_navigation():
+        page.get_by_role("button", name="Criar Arquivo").click()
+    expect(page.locator(".alert-success")).to_be_visible()
+    # Verify in folder
+    page.goto(f"{BASE}/folders/")
+    page.locator(".list-group-item", has_text=f"Pasta {UNIQUE}").first.click()
+    page.wait_for_load_state("domcontentloaded")
+    expect(page.get_by_text(f"texto-pasta-{UNIQUE}.txt")).to_be_visible()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CROSS-USER ISOLATION: user cannot see other user's private resources
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_user_b_cannot_see_user_a_files_in_folder(page: Page):
+    """User B browsing a folder should NOT see User A's private files."""
+    _login_and_go(page, "/folders/", USER_EMAIL, USER_PASS)
+    folder_link = page.locator(".list-group-item", has_text=f"Pasta {UNIQUE}")
+    if folder_link.count() == 0:
+        pytest.skip("Folder not visible to user B (expected)")
+        return
+    folder_link.first.click()
+    page.wait_for_load_state("domcontentloaded")
+    # User B should NOT see admin's files in this folder
+    expect(page.get_by_text(f"infolder-{UNIQUE}.txt")).to_have_count(0)
+
+
+def test_user_b_cannot_access_user_a_file_detail(page: Page):
+    """User B cannot access file detail of User A's file via direct URL."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_file_as(admin_s, f"PrivFile-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create admin file")
+    r = user_s.get(f"{BASE}/files/{pk}/")
+    assert r.status_code == 403
+
+
+def test_user_b_cannot_download_user_a_file(page: Page):
+    """User B cannot download User A's file."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_file_as(admin_s, f"PrivDL-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create admin file")
+    r = user_s.get(f"{BASE}/files/{pk}/download/")
+    assert r.status_code in (302, 403)
+
+
+def test_share_file_then_recipient_can_access(page: Page):
+    """Full share flow: admin shares file, user can access, then unshare."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_file_as(admin_s, f"ShareFlow-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create file")
+    # User cannot access before share
+    r = user_s.get(f"{BASE}/files/{pk}/")
+    assert r.status_code == 403
+    # Admin shares with user
+    _csrf_post(admin_s, f"{BASE}/files/{pk}/share/",
+               data={"user_query": USER_EMAIL}, referer_url=f"{BASE}/files/{pk}/")
+    # User can access after share
+    r = user_s.get(f"{BASE}/files/{pk}/")
+    assert r.status_code == 200
+    # Admin unshares
+    r2 = admin_s.get(f"{BASE}/files/{pk}/")
+    user_id_match = re.search(rf'name="user_id"\s+value="({_UUID_RE})"', r2.text)
+    if user_id_match:
+        uid = user_id_match.group(1)
+        _csrf_post(admin_s, f"{BASE}/files/{pk}/unshare/",
+                   data={"user_id": uid}, referer_url=f"{BASE}/files/{pk}/")
+    # User cannot access after unshare
+    r = user_s.get(f"{BASE}/files/{pk}/")
+    assert r.status_code == 403
+
+
+def test_share_password_then_recipient_can_access(page: Page):
+    """Full password share flow: admin shares, user accesses, admin unshares."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_password_as(admin_s, f"SharePwd-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create password")
+    # User cannot access before share
+    r = user_s.get(f"{BASE}/passwords/{pk}/")
+    assert r.status_code == 403
+    # Admin shares
+    _csrf_post(admin_s, f"{BASE}/passwords/{pk}/share/",
+               data={"user_email": USER_EMAIL}, referer_url=f"{BASE}/passwords/{pk}/")
+    # User can access after share
+    r = user_s.get(f"{BASE}/passwords/{pk}/")
+    assert r.status_code == 200
+
+
+def test_user_cannot_edit_other_user_password(page: Page):
+    """User B cannot edit User A's password."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_password_as(admin_s, f"NoEdit-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create password")
+    r = user_s.get(f"{BASE}/passwords/{pk}/edit/", allow_redirects=False)
+    assert r.status_code in (302, 403)
+
+
+def test_user_cannot_share_file_they_dont_own(page: Page):
+    """User B cannot share User A's file with someone else."""
+    admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    pk = _create_file_as(admin_s, f"NoShare-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create file")
+    r = _csrf_post(user_s, f"{BASE}/files/{pk}/share/",
+                   data={"user_query": ADMIN_EMAIL}, referer_url=f"{BASE}/files/")
+    assert r.status_code in (302, 403)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # SECURITY: IDOR, ownership, authorization tests
 # ═══════════════════════════════════════════════════════════════════════════
 

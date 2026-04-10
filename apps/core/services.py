@@ -122,6 +122,8 @@ class FolderService:
     def create(user, *, name, parent_id=None):
         if not name:
             raise ValidationError("Nome da pasta é obrigatório.")
+        if Folder.objects.filter(name=name, parent_id=parent_id, deleted_at__isnull=True).exists():
+            raise ValidationError("Já existe uma pasta com este nome neste local.")
         return Folder.objects.create(name=name, parent_id=parent_id, created_by=user)
 
     @staticmethod
