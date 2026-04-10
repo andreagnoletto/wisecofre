@@ -18,6 +18,7 @@ from apps.core.views_web import (
     file_share,
     file_unshare,
     file_upload,
+    file_create_text,
     folder_delete,
     folder_detail,
     folder_list,
@@ -90,6 +91,7 @@ urlpatterns = [
     # ── Files ─────────────────────────────────────────────────────────────
     path("files/", file_list, name="file_list"),
     path("files/upload/", file_upload, name="file_upload"),
+    path("files/new/", file_create_text, name="file_create_text"),
     path("files/<uuid:pk>/", file_detail, name="file_detail"),
     path("files/<uuid:pk>/download/", file_download, name="file_download"),
     path("files/<uuid:pk>/delete/", file_delete, name="file_delete"),

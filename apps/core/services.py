@@ -5,6 +5,7 @@ Views chamam services; services levantam PermissionDenied/ValidationError.
 import hashlib
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.shortcuts import get_object_or_404
 
@@ -266,6 +267,32 @@ class FileService:
         fr = FileResource.objects.create(
             resource=resource, storage_key=saved_path, size_bytes=uploaded_file.size,
             original_name_encrypted=uploaded_file.name, mime_category=cat,
+            checksum_sha256=checksum, upload_completed=True, created_by=user,
+        )
+        FileSecret.objects.create(
+            file_resource=fr, user=user, session_key_encrypted="local-storage",
+        )
+        return fr
+
+    @staticmethod
+    def create_text(user, name, content, folder_id=None):
+        raw = content.encode("utf-8")
+        if len(raw) > 10 * 1024 * 1024:
+            raise ValidationError("Conteúdo excede o tamanho máximo de 10 MB.")
+        checksum = hashlib.sha256(raw).hexdigest()
+        if not name.endswith(".txt"):
+            name += ".txt"
+        storage_key = f"files/{user.pk}/{checksum[:8]}_{name}"
+        saved_path = default_storage.save(storage_key, ContentFile(raw))
+
+        rt, _ = ResourceType.objects.get_or_create(slug="file", defaults={"name": "Arquivo"})
+        resource = Resource.objects.create(
+            name=name, resource_type=rt,
+            created_by=user, folder_id=folder_id,
+        )
+        fr = FileResource.objects.create(
+            resource=resource, storage_key=saved_path, size_bytes=len(raw),
+            original_name_encrypted=name, mime_category="document",
             checksum_sha256=checksum, upload_completed=True, created_by=user,
         )
         FileSecret.objects.create(

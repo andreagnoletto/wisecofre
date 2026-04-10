@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block page_title %}Novo Arquivo de Texto{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label for="name" class="form-label fw-semibold">Nome do arquivo</label>
+                        <input type="text" class="form-control" id="name" name="name"
+                               placeholder="senhas-servidor.txt" required>
+                        <div class="form-text">A extensão .txt será adicionada automaticamente se não informada.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="content" class="form-label fw-semibold">Conteúdo</label>
+                        <textarea class="form-control font-monospace" id="content" name="content"
+                                  rows="14" placeholder="Cole ou digite o conteúdo aqui..." required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted">Pasta (opcional)</label>
+                        <select name="folder" class="form-select form-select-sm">
+                            <option value="">Nenhuma pasta</option>
+                            {% for folder in folders %}
+                            <option value="{{ folder.pk }}">{{ folder.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-file-earmark-plus me-1"></i>Criar Arquivo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

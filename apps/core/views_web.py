@@ -520,6 +520,31 @@ def file_upload(request):
 
 
 @login_required
+def file_create_text(request):
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        content = request.POST.get("content", "")
+        if not name:
+            messages.error(request, "Informe um nome para o arquivo.")
+            return redirect("file_create_text")
+        if not content:
+            messages.error(request, "O conteúdo não pode estar vazio.")
+            return redirect("file_create_text")
+        try:
+            fr = FileService.create_text(
+                request.user, name, content,
+                folder_id=request.POST.get("folder") or None,
+            )
+            messages.success(request, f'Arquivo "{fr.original_name_encrypted}" criado.')
+            return redirect("file_detail", pk=fr.pk)
+        except ValidationError as e:
+            messages.error(request, str(e.message if hasattr(e, "message") else e))
+            return redirect("file_create_text")
+    folders = Folder.objects.filter(deleted_at__isnull=True)
+    return render(request, "files/create_text.html", {"folders": folders})
+
+
+@login_required
 def file_detail(request, pk):
     try:
         file, secret = FileService.get_or_deny(request.user, pk)
