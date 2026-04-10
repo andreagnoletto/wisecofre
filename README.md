@@ -21,19 +21,34 @@ Gerenciador de senhas, arquivos e segredos com criptografia — alternativa self
 | Backend | Django 6, DRF |
 | Frontend | Django Templates, Alpine.js, Bootstrap 5.3 |
 | Database | PostgreSQL 16 |
-| Cache/Broker | Redis 7 |
+| Cache | Django DatabaseCache |
 | Storage | MinIO (S3-compatible) |
-| Tasks | Celery + Celery Beat |
 | Auth | Session + JWT, TOTP MFA |
 | Deploy | Docker Compose, Coolify |
 
-## Dev Local
+## Dev Local (Docker)
+
+Tudo roda num unico `docker-compose.yml` (web, db, minio):
 
 ```bash
-# 1. Subir infra
-docker compose up -d
+docker compose up -d --build
+```
 
-# 2. Copiar .env
+Acesse `http://localhost:8003`
+
+Criar usuario admin:
+
+```bash
+docker compose exec web python manage.py createsuperuser
+```
+
+## Dev Local (sem Docker)
+
+```bash
+# 1. Subir infra (PostgreSQL + MinIO)
+docker compose up -d db minio minio-init
+
+# 2. Copiar .env e ajustar
 cp .env.example .env
 
 # 3. Instalar dependencias
@@ -42,17 +57,58 @@ uv sync
 # 4. Migrations e servidor
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
-uv run python manage.py runserver
+uv run python manage.py runserver 8003
 ```
 
-Acesse `http://localhost:8000`
+Acesse `http://localhost:8003`
 
-## Testes
+## Testes E2E
+
+Os 87 testes E2E rodam com Playwright contra a aplicacao rodando (Docker ou Coolify).
+
+### Contra Docker local
 
 ```bash
-# Subir infra + servidor Django antes
-uv run python -m pytest tests/test_e2e.py -v
+# 1. Garantir que o Docker esta rodando
+docker compose up -d --build
+
+# 2. Criar usuarios de teste (se primeira vez)
+docker compose exec web python manage.py shell -c "
+from apps.accounts.models import User
+User.objects.create_superuser(username='admin', email='admin@wisecofre.io', password='admin123', role='ADMIN')
+u = User.objects.create_user(username='joao', email='joao@wisecofre.io', password='senha123')
+u.first_name, u.last_name = 'João', 'Silva'; u.save()
+"
+
+# 3. Instalar dependencias de teste
+uv pip install pytest playwright pytest-playwright psycopg pyotp requests
+uv run python -m playwright install chromium
+
+# 4. Rodar testes
+$env:E2E_BASE_URL = "http://localhost:8003"
+$env:E2E_DATABASE_URL = "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre"
+$env:DJANGO_SETTINGS_MODULE = "config.settings.test"
+$env:SECRET_KEY = "test-key"
+uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
 ```
+
+### Contra Coolify (producao)
+
+```bash
+$env:E2E_BASE_URL = "https://cofre.wisedoc.com.br"
+uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
+```
+
+> Os 6 testes de seguranca que usam acesso direto ao DB serao skipped sem `E2E_DATABASE_URL`.
+
+### Variaveis de ambiente dos testes
+
+| Variavel | Default | Descricao |
+|---|---|---|
+| `E2E_BASE_URL` | `http://localhost:8003` | URL da aplicacao |
+| `E2E_DATABASE_URL` | `postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre` | Conexao direta ao DB (para testes de seguranca) |
+| `DJANGO_SETTINGS_MODULE` | `config.settings.test` | Settings do Django (necessario para pytest-django) |
+| `SECRET_KEY` | *(obrigatorio)* | Qualquer valor para pytest-django carregar |
 
 ## Deploy (Coolify)
 
@@ -73,10 +129,9 @@ wisecofre/
 │   ├── resources/    # Senhas, secrets, tags
 │   └── sharing/      # Permissoes, compartilhamento
 ├── config/           # Settings, URLs, WSGI
-├── Dockerfile        # Imagem Docker
-├── entrypoint.sh     # Entrypoint do container
 ├── templates/        # Django templates
 ├── tests/            # E2E Playwright
-├── docker-compose.yml       # Dev local (infra)
-└── docker-compose.prod.yml  # Producao (Coolify)
+├── Dockerfile        # Imagem Docker
+├── entrypoint.sh     # Entrypoint do container
+└── docker-compose.yml  # Unico compose (local + Coolify)
 ```
