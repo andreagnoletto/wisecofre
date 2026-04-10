@@ -273,6 +273,13 @@ def password_share(request, pk):
 
 # ── Folders ───────────────────────────────────────────────────────────────
 
+def _user_folders(user, **extra_filters):
+    qs = Folder.objects.filter(deleted_at__isnull=True, **extra_filters)
+    if not user.is_staff:
+        qs = qs.filter(created_by=user)
+    return qs
+
+
 @login_required
 def folder_list(request):
     if request.method == "POST":
@@ -286,14 +293,17 @@ def folder_list(request):
         except ValidationError as e:
             messages.error(request, str(e.message if hasattr(e, "message") else e))
         return redirect("folder_list")
-    folders = Folder.objects.filter(parent__isnull=True, deleted_at__isnull=True).prefetch_related("children")
-    all_folders = Folder.objects.filter(deleted_at__isnull=True)
+    folders = _user_folders(request.user, parent__isnull=True).prefetch_related("children")
+    all_folders = _user_folders(request.user)
     return render(request, "folders/list.html", {"folders": folders, "all_folders": all_folders})
 
 
 @login_required
 def folder_detail(request, pk):
     folder = get_object_or_404(Folder, pk=pk, deleted_at__isnull=True)
+    if not request.user.is_staff and folder.created_by != request.user:
+        messages.error(request, "Sem permissão.")
+        return redirect("folder_list")
     if request.method == "POST":
         try:
             FolderService.create(
@@ -325,8 +335,8 @@ def folder_detail(request, pk):
             pk__in=FileSecret.objects.filter(user=user).values_list("file_resource_id", flat=True),
         ).select_related("resource")
 
-    children = Folder.objects.filter(parent=folder, deleted_at__isnull=True)
-    all_folders = Folder.objects.filter(deleted_at__isnull=True)
+    children = _user_folders(user, parent=folder)
+    all_folders = _user_folders(user)
     return render(request, "folders/list.html", {
         "folders": children, "current_folder": folder,
         "passwords": passwords, "file_resources": file_resources,
@@ -535,7 +545,7 @@ def file_upload(request):
         except ValidationError as e:
             messages.error(request, str(e.message if hasattr(e, "message") else e))
             return redirect("file_upload")
-    folders = Folder.objects.filter(deleted_at__isnull=True)
+    folders = _user_folders(request.user)
     return render(request, "files/upload.html", {"folders": folders})
 
 
@@ -560,7 +570,7 @@ def file_create_text(request):
         except ValidationError as e:
             messages.error(request, str(e.message if hasattr(e, "message") else e))
             return redirect("file_create_text")
-    folders = Folder.objects.filter(deleted_at__isnull=True)
+    folders = _user_folders(request.user)
     return render(request, "files/create_text.html", {"folders": folders})
 
 
