@@ -6,7 +6,8 @@ import pytest
 from playwright.sync_api import Page, expect
 
 
-BASE = "http://127.0.0.1:8000"
+import os
+BASE = os.environ.get("E2E_BASE_URL", "http://localhost:8003")
 ADMIN_EMAIL = "admin@wisecofre.io"
 ADMIN_PASS = "admin123"
 USER_EMAIL = "joao@wisecofre.io"
@@ -236,7 +237,7 @@ def test_group_add_member(page: Page):
     with page.expect_navigation():
         page.get_by_role("button", name="Adicionar").click()
     expect(page.locator(".alert-success")).to_be_visible()
-    expect(page.get_by_text("joao@wisecofre.io")).to_be_visible()
+    expect(page.get_by_role("cell", name="joao@wisecofre.io")).to_be_visible()
 
 
 def test_group_toggle_admin(page: Page):
@@ -501,7 +502,7 @@ def test_file_delete(page: Page, tmp_path):
 def test_users_page_loads(page: Page):
     _login_and_go(page, "/users/")
     expect(page.get_by_role("button", name=re.compile("Convidar"))).to_be_visible()
-    expect(page.get_by_text("admin@wisecofre.io")).to_be_visible()
+    expect(page.get_by_role("cell", name="admin@wisecofre.io")).to_be_visible()
 
 
 def test_user_invite(page: Page):
@@ -579,7 +580,8 @@ def _reset_admin_password():
     import psycopg
     from django.contrib.auth.hashers import make_password
     hashed = make_password(ADMIN_PASS, hasher="pbkdf2_sha256")
-    conn = psycopg.connect("dbname=wisecofre user=wisecofre password=password host=localhost port=5432")
+    _db = os.environ.get("E2E_DATABASE_URL", "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre")
+    conn = psycopg.connect(_db)
     cur = conn.cursor()
     cur.execute("UPDATE accounts_user SET password = %s WHERE email = %s", (hashed, ADMIN_EMAIL))
     conn.commit()
@@ -814,7 +816,8 @@ def _extract_secret_from_setup(page: Page) -> str:
 def test_mfa_cleanup_before_tests(page: Page):
     """Ensure MFA is disabled before running MFA tests."""
     import psycopg
-    conn = psycopg.connect("postgresql://wisecofre:password@localhost:5432/wisecofre", autocommit=True)
+    _db = os.environ.get("E2E_DATABASE_URL", "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre")
+    conn = psycopg.connect(_db, autocommit=True)
     conn.execute("DELETE FROM mfa_backupcode")
     conn.execute("DELETE FROM mfa_totpdevice")
     conn.close()
@@ -946,7 +949,7 @@ def _get_session(email, password):
     csrf = m.group(1) if m else ""
     s.post(f"{BASE}/login/", data={
         "email": email, "password": password, "csrfmiddlewaretoken": csrf,
-    })
+    }, headers={"Referer": f"{BASE}/login/"})
     return s
 
 
@@ -965,97 +968,106 @@ def _csrf_post(session, url, data=None, referer_url=None):
 _UUID_RE = r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 
+def _create_password_as(session, name):
+    """Create a password via HTTP and return its UUID."""
+    _csrf_post(session, f"{BASE}/passwords/new/", data={
+        "name": name, "uri": "https://sec.example.com",
+        "username": "secuser", "secret": "secpass123",
+        "description": "security test",
+    }, referer_url=f"{BASE}/passwords/new/")
+    r = session.get(f"{BASE}/passwords/")
+    for pk in re.findall(rf'href="/passwords/({_UUID_RE})/"', r.text):
+        detail = session.get(f"{BASE}/passwords/{pk}/")
+        if name in detail.text:
+            return pk
+    return None
+
+
+def _create_file_as(session, name):
+    """Upload a small file via HTTP and return its UUID."""
+    ref = f"{BASE}/files/upload/"
+    r = session.get(ref)
+    m = re.search(r'csrfmiddlewaretoken.*?value="(.*?)"', r.text)
+    csrf = m.group(1) if m else session.cookies.get("csrftoken", "")
+    import io
+    files = {"file": (f"{name}.txt", io.BytesIO(b"sec test content"), "text/plain")}
+    data = {"csrfmiddlewaretoken": csrf, "description": "security test file"}
+    session.post(f"{BASE}/files/upload/", data=data, files=files,
+                 headers={"Referer": ref})
+    r = session.get(f"{BASE}/files/")
+    for pk in re.findall(rf'href="/files/({_UUID_RE})/"', r.text):
+        detail = session.get(f"{BASE}/files/{pk}/")
+        if name in detail.text:
+            return pk
+    return None
+
+
 def test_security_user_cannot_delete_other_user_password(page: Page):
     """User B cannot delete a password created by User A."""
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
     user_s = _get_session(USER_EMAIL, USER_PASS)
-    r = admin_s.get(f"{BASE}/passwords/")
-    links = re.findall(rf'href="/passwords/({_UUID_RE})/"', r.text)
-    if not links:
-        pytest.skip("No admin password found")
-    pk = links[0]
+    pk = _create_password_as(admin_s, f"SecDel-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create admin password")
     r = _csrf_post(user_s, f"{BASE}/passwords/{pk}/delete/",
                     referer_url=f"{BASE}/passwords/")
     assert r.status_code in (302, 403)
+    detail = admin_s.get(f"{BASE}/passwords/{pk}/")
+    assert detail.status_code == 200, "Password should still exist"
 
 
 def test_security_user_cannot_access_other_user_password_detail(page: Page):
     """User B cannot see password detail if no Secret exists for them."""
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
     user_s = _get_session(USER_EMAIL, USER_PASS)
-    unique_name = f"PrivPwd-{UNIQUE}"
-    _csrf_post(admin_s, f"{BASE}/passwords/new/", data={
-        "name": unique_name, "uri": "https://priv.example.com",
-        "username": "privuser", "secret": "privpass123",
-        "description": "private",
-    }, referer_url=f"{BASE}/passwords/new/")
-    r = admin_s.get(f"{BASE}/passwords/")
-    pks = re.findall(rf'href="/passwords/({_UUID_RE})/"', r.text)
-    priv_pk = None
-    for pk in pks:
-        detail = admin_s.get(f"{BASE}/passwords/{pk}/")
-        if unique_name in detail.text:
-            priv_pk = pk
-            break
-    if not priv_pk:
+    pk = _create_password_as(admin_s, f"PrivPwd2-{UNIQUE}")
+    if not pk:
         pytest.skip("Could not create private admin password")
-    r = user_s.get(f"{BASE}/passwords/{priv_pk}/")
+    r = user_s.get(f"{BASE}/passwords/{pk}/")
     assert r.status_code == 403
 
 
 def test_security_non_admin_cannot_manage_group(page: Page):
-    """Non-admin group member cannot remove members."""
+    """Non-admin user cannot access group management endpoints."""
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
     user_s = _get_session(USER_EMAIL, USER_PASS)
-    # Admin creates a group and adds user as regular member
-    # Create a group as admin
-    r = _csrf_post(admin_s, f"{BASE}/groups/", data={
-        "name": f"SecurityGrp-{UNIQUE}",
+    _csrf_post(admin_s, f"{BASE}/groups/", data={
+        "name": f"SecGrp2-{UNIQUE}",
     }, referer_url=f"{BASE}/groups/")
     r = admin_s.get(f"{BASE}/groups/")
-    group_pks = re.findall(rf'href="/groups/({_UUID_RE})/"', r.text)
     grp_pk = None
-    for pk in set(group_pks):
+    for pk in set(re.findall(rf'href="/groups/({_UUID_RE})/"', r.text)):
         r2 = admin_s.get(f"{BASE}/groups/{pk}/")
-        if f"SecurityGrp-{UNIQUE}" in r2.text:
+        if f"SecGrp2-{UNIQUE}" in r2.text:
             grp_pk = pk
             break
     if not grp_pk:
         pytest.skip("Could not find created group")
-    # Add user as regular member
-    admin_uid_match = re.search(rf'/groups/{_UUID_RE}/toggle-admin/({_UUID_RE})/',
-                                admin_s.get(f"{BASE}/groups/{grp_pk}/").text)
-    admin_uid = admin_uid_match.group(1) if admin_uid_match else None
-    # User B tries to remove admin from the group
-    if admin_uid:
-        r = _csrf_post(user_s, f"{BASE}/groups/{grp_pk}/remove-member/{admin_uid}/",
-                        referer_url=f"{BASE}/groups/{grp_pk}/")
-        assert r.status_code in (302, 403)
+    r = user_s.get(f"{BASE}/groups/{grp_pk}/")
+    assert r.status_code in (302, 403) or "Sem permissão" in r.text
 
 
 def test_security_user_cannot_delete_other_user_file(page: Page):
     """User B cannot delete a file owned by User A."""
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
     user_s = _get_session(USER_EMAIL, USER_PASS)
-    r = admin_s.get(f"{BASE}/files/")
-    file_pks = re.findall(rf'href="/files/({_UUID_RE})/"', r.text)
-    if not file_pks:
-        pytest.skip("No admin files found")
-    pk = file_pks[0]
+    pk = _create_file_as(admin_s, f"SecFile-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create admin file")
     r = _csrf_post(user_s, f"{BASE}/files/{pk}/delete/",
                     referer_url=f"{BASE}/files/")
     assert r.status_code in (302, 403)
+    detail = admin_s.get(f"{BASE}/files/{pk}/")
+    assert detail.status_code == 200, "File should still exist"
 
 
 def test_security_user_cannot_unshare_file_they_dont_own(page: Page):
     """Only the file owner can revoke sharing."""
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
     user_s = _get_session(USER_EMAIL, USER_PASS)
-    r = admin_s.get(f"{BASE}/files/")
-    file_pks = re.findall(rf'href="/files/({_UUID_RE})/"', r.text)
-    if not file_pks:
-        pytest.skip("No admin files found")
-    pk = file_pks[0]
+    pk = _create_file_as(admin_s, f"SecUnsh-{UNIQUE}")
+    if not pk:
+        pytest.skip("Could not create admin file")
     r = _csrf_post(user_s, f"{BASE}/files/{pk}/unshare/", data={"user_id": "fake-id"},
                     referer_url=f"{BASE}/files/")
     assert r.status_code in (302, 403)
@@ -1063,17 +1075,16 @@ def test_security_user_cannot_unshare_file_they_dont_own(page: Page):
 
 def test_security_non_member_cannot_access_group_detail(page: Page):
     """User who is not a group member cannot view group details."""
-    user_s = _get_session(USER_EMAIL, USER_PASS)
     admin_s = _get_session(ADMIN_EMAIL, ADMIN_PASS)
-    r = _csrf_post(admin_s, f"{BASE}/groups/", data={
-        "name": f"PrivateGrp-{UNIQUE}",
+    user_s = _get_session(USER_EMAIL, USER_PASS)
+    _csrf_post(admin_s, f"{BASE}/groups/", data={
+        "name": f"PrivGrp2-{UNIQUE}",
     }, referer_url=f"{BASE}/groups/")
     r = admin_s.get(f"{BASE}/groups/")
-    group_pks = re.findall(rf'href="/groups/({_UUID_RE})/"', r.text)
     grp_pk = None
-    for pk in set(group_pks):
+    for pk in set(re.findall(rf'href="/groups/({_UUID_RE})/"', r.text)):
         r2 = admin_s.get(f"{BASE}/groups/{pk}/")
-        if f"PrivateGrp-{UNIQUE}" in r2.text:
+        if f"PrivGrp2-{UNIQUE}" in r2.text:
             grp_pk = pk
             break
     if not grp_pk:
