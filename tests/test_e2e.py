@@ -9,9 +9,9 @@ from playwright.sync_api import Page, expect
 import os
 BASE = os.environ.get("E2E_BASE_URL", "http://localhost:8003")
 ADMIN_EMAIL = "admin@wisecofre.io"
-ADMIN_PASS = "admin123"
+ADMIN_PASS = "admin123admin123"
 USER_EMAIL = "joao@wisecofre.io"
-USER_PASS = "senha123"
+USER_PASS = "senha123senha123"
 
 UNIQUE = uuid.uuid4().hex[:6]
 
@@ -575,29 +575,54 @@ def test_profile_update(page: Page):
     expect(page.locator('input[name="first_name"]')).to_have_value("Admin")
 
 
-def _reset_admin_password():
-    """Restore admin password via psycopg (bypasses min-length validation)."""
-    import psycopg
-    from django.contrib.auth.hashers import make_password
-    hashed = make_password(ADMIN_PASS, hasher="pbkdf2_sha256")
-    _db = os.environ.get("E2E_DATABASE_URL", "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre")
-    conn = psycopg.connect(_db)
-    cur = conn.cursor()
-    cur.execute("UPDATE accounts_user SET password = %s WHERE email = %s", (hashed, ADMIN_EMAIL))
-    conn.commit()
-    conn.close()
+_TEMP_PASS = "newadmin-long-password-123"
+
+
+def _reset_admin_password_via_db():
+    """Restore admin password via psycopg (when DB is accessible)."""
+    try:
+        import psycopg
+        from django.contrib.auth.hashers import make_password
+        hashed = make_password(ADMIN_PASS, hasher="pbkdf2_sha256")
+        _db = os.environ.get("E2E_DATABASE_URL", "")
+        if not _db:
+            return False
+        conn = psycopg.connect(_db)
+        cur = conn.cursor()
+        cur.execute("UPDATE accounts_user SET password = %s WHERE email = %s", (hashed, ADMIN_EMAIL))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def _reset_admin_password_via_browser(page: Page):
+    """Restore admin password using the change-password form."""
+    page.goto(f"{BASE}/login/")
+    if "/login" in page.url:
+        page.fill('input[name="email"]', ADMIN_EMAIL)
+        page.fill('input[name="password"]', _TEMP_PASS)
+        page.click('button[type="submit"]')
+        page.wait_for_load_state("networkidle")
+    page.goto(f"{BASE}/profile/")
+    page.fill('#currentPwd', _TEMP_PASS)
+    page.fill('#newPwd', ADMIN_PASS)
+    page.fill('#confirmPwd', ADMIN_PASS)
+    with page.expect_navigation():
+        page.get_by_role("button", name="Alterar Senha").click()
 
 
 def test_profile_change_password(page: Page):
     _login_and_go(page, "/profile/")
-    long_new = "newadmin-long-password-123"
     page.fill('#currentPwd', ADMIN_PASS)
-    page.fill('#newPwd', long_new)
-    page.fill('#confirmPwd', long_new)
+    page.fill('#newPwd', _TEMP_PASS)
+    page.fill('#confirmPwd', _TEMP_PASS)
     with page.expect_navigation():
         page.get_by_role("button", name="Alterar Senha").click()
     expect(page.locator(".alert-success")).to_be_visible()
-    _reset_admin_password()
+    if not _reset_admin_password_via_db():
+        _reset_admin_password_via_browser(page)
 
 
 def test_profile_change_password_mismatch(page: Page):
@@ -815,12 +840,18 @@ def _extract_secret_from_setup(page: Page) -> str:
 
 def test_mfa_cleanup_before_tests(page: Page):
     """Ensure MFA is disabled before running MFA tests."""
-    import psycopg
-    _db = os.environ.get("E2E_DATABASE_URL", "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre")
-    conn = psycopg.connect(_db, autocommit=True)
-    conn.execute("DELETE FROM mfa_backupcode")
-    conn.execute("DELETE FROM mfa_totpdevice")
-    conn.close()
+    _db = os.environ.get("E2E_DATABASE_URL", "")
+    if _db:
+        import psycopg
+        conn = psycopg.connect(_db, autocommit=True)
+        conn.execute("DELETE FROM mfa_backupcode")
+        conn.execute("DELETE FROM mfa_totpdevice")
+        conn.close()
+    else:
+        _login_and_go(page, "/profile/")
+        if page.locator("text=MFA ativo").is_visible():
+            page.get_by_role("link", name=re.compile("Desativar|Disable")).click()
+            page.wait_for_load_state("networkidle")
 
 
 def test_mfa_setup_page_loads(page: Page):
