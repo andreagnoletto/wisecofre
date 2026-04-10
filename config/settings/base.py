@@ -214,8 +214,8 @@ _minio_use_https = env.bool("MINIO_USE_HTTPS", default=False)
 _minio_scheme = "https" if _minio_use_https else "http"
 
 AWS_S3_ENDPOINT_URL = f"{_minio_scheme}://{_minio_endpoint}"
-AWS_ACCESS_KEY_ID = env("MINIO_ACCESS_KEY", default="")
-AWS_SECRET_ACCESS_KEY = env("MINIO_SECRET_KEY", default="")
+AWS_ACCESS_KEY_ID = env("STORAGE_ACCESS_KEY", default="")
+AWS_SECRET_ACCESS_KEY = env("STORAGE_SECRET_KEY", default="")
 AWS_STORAGE_BUCKET_NAME = env("MINIO_BUCKET_NAME", default="wisecofre-files")
 AWS_S3_FILE_OVERWRITE = False
 AWS_QUERYSTRING_AUTH = True

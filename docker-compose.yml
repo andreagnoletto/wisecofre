@@ -5,8 +5,8 @@ x-django-env: &django-env
   ALLOWED_HOSTS: ${ALLOWED_HOSTS:-cofre.wisedoc.com.br,localhost,127.0.0.1}
   DATABASE_URL: ${DATABASE_URL:-postgresql://wisecofre:wc-db-p4ss-2026@db:5432/wisecofre}
   MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
-  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
+  STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-wc-minio-access-2026}
+  STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
   MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-wisecofre-files}
   MINIO_USE_HTTPS: ${MINIO_USE_HTTPS:-False}
   APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8003}
@@ -65,8 +65,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY:-wc-minio-access-2026}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
     volumes:
       - miniodata:/data
     healthcheck:
@@ -78,6 +78,7 @@ services:
 
   minio-init:
     image: minio/mc:latest
+    restart: "no"
     depends_on:
       minio:
         condition: service_healthy
@@ -88,8 +89,8 @@ services:
       echo 'Bucket pronto.';
       "
     environment:
-      MC_USER: ${MINIO_ACCESS_KEY:-wc-minio-access-2026}
-      MC_PASS: ${MINIO_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
+      MC_USER: ${STORAGE_ACCESS_KEY:-wc-minio-access-2026}
+      MC_PASS: ${STORAGE_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
       MC_BUCKET: ${MINIO_BUCKET_NAME:-wisecofre-files}
 
 volumes:
