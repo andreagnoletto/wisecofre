@@ -66,9 +66,13 @@ Acesse `http://localhost:8003`
 
 Os 87 testes E2E rodam com Playwright contra a aplicacao rodando (Docker ou Coolify).
 
+> **IMPORTANTE:** Os testes E2E rodam na sua **maquina local** (Windows/PowerShell).
+> O Playwright abre um browser local que acessa a aplicacao remotamente.
+> Nao rode esses comandos dentro do Coolify ou de um servidor Linux.
+
 ### Contra Docker local
 
-```bash
+```powershell
 # 1. Garantir que o Docker esta rodando
 docker compose up -d --build
 
@@ -80,11 +84,11 @@ u = User.objects.create_user(username='joao', email='joao@wisecofre.io', passwor
 u.first_name, u.last_name = 'João', 'Silva'; u.save()
 "
 
-# 3. Instalar dependencias de teste
+# 3. Instalar dependencias de teste (apenas na primeira vez)
 uv pip install pytest playwright pytest-playwright psycopg pyotp requests
 uv run python -m playwright install chromium
 
-# 4. Rodar testes
+# 4. Setar variaveis e rodar testes
 $env:E2E_BASE_URL = "http://localhost:8003"
 $env:E2E_DATABASE_URL = "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre"
 $env:DJANGO_SETTINGS_MODULE = "config.settings.test"
@@ -94,8 +98,12 @@ uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project
 
 ### Contra Coolify (producao)
 
-```bash
+Rode no PowerShell da sua maquina local (nao no servidor):
+
+```powershell
 $env:E2E_BASE_URL = "https://cofre.wisedoc.com.br"
+$env:DJANGO_SETTINGS_MODULE = "config.settings.test"
+$env:SECRET_KEY = "test-key"
 uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
 ```
 

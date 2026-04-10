@@ -103,16 +103,25 @@ Se o webhook estiver configurado no Coolify, cada `git push` no branch `main` di
 
 ## Testes E2E contra Coolify
 
-Apos o deploy, rode os testes da sua maquina local:
+> **IMPORTANTE:** Os testes rodam na sua **maquina local** (Windows/PowerShell),
+> NAO no terminal do Coolify. O Playwright abre um browser local que acessa
+> o Coolify remotamente via HTTPS. Voce precisa de `uv`, `playwright` e `chromium`
+> instalados localmente.
 
-```bash
-# PowerShell
+Apos o deploy, no PowerShell da sua maquina local:
+
+```powershell
+# Setar variaveis de ambiente
 $env:E2E_BASE_URL = "https://cofre.wisedoc.com.br"
+$env:DJANGO_SETTINGS_MODULE = "config.settings.test"
+$env:SECRET_KEY = "test-key"
+
+# Rodar testes
 uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
 ```
 
 > Os 6 testes de seguranca que acessam o DB diretamente serao **skipped** sem `E2E_DATABASE_URL`.
-> Os outros 81 testes rodam normalmente via HTTP/browser.
+> Os outros 81 testes rodam normalmente via browser apontando para o Coolify.
 
 ## Notas
 
