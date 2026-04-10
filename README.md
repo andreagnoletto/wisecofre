@@ -76,19 +76,11 @@ Os 87 testes E2E rodam com Playwright contra a aplicacao rodando (Docker ou Cool
 # 1. Garantir que o Docker esta rodando
 docker compose up -d --build
 
-# 2. Criar usuarios de teste (se primeira vez)
-docker compose exec web python manage.py shell -c "
-from apps.accounts.models import User
-User.objects.create_superuser(username='admin', email='admin@wisecofre.io', password='admin123', role='ADMIN')
-u = User.objects.create_user(username='joao', email='joao@wisecofre.io', password='senha123')
-u.first_name, u.last_name = 'João', 'Silva'; u.save()
-"
-
-# 3. Instalar dependencias de teste (apenas na primeira vez)
+# 2. Instalar dependencias de teste (apenas na primeira vez)
 uv pip install pytest playwright pytest-playwright psycopg pyotp requests
 uv run python -m playwright install chromium
 
-# 4. Setar variaveis e rodar testes
+# 3. Setar variaveis e rodar testes
 $env:E2E_BASE_URL = "http://localhost:8003"
 $env:E2E_DATABASE_URL = "postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre"
 $env:DJANGO_SETTINGS_MODULE = "config.settings.test"
@@ -96,25 +88,33 @@ $env:SECRET_KEY = "test-key"
 uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
 ```
 
+> Com `E2E_DATABASE_URL` definido, os testes criam usuarios temporarios dedicados
+> (`testadm-xxx@wisecofre.io`, `testusr-xxx@wisecofre.io`) no inicio e removem no final.
+> O admin real da aplicacao **nunca e tocado**.
+
 ### Contra Coolify (producao)
 
-Rode no PowerShell da sua maquina local (nao no servidor):
+Rode no PowerShell da sua maquina local (nao no servidor).
+E necessario expor a porta do DB ou criar um tunnel SSH para que `E2E_DATABASE_URL` funcione:
 
 ```powershell
 $env:E2E_BASE_URL = "https://cofre.wisedoc.com.br"
+$env:E2E_DATABASE_URL = "postgresql://wisecofre:SENHA@IP_SERVIDOR:5433/wisecofre"
 $env:DJANGO_SETTINGS_MODULE = "config.settings.test"
 $env:SECRET_KEY = "test-key"
 uv run python -m pytest tests/test_e2e.py -v --override-ini="django_find_project=false"
 ```
 
-> Os 6 testes de seguranca que usam acesso direto ao DB serao skipped sem `E2E_DATABASE_URL`.
+> Sem `E2E_DATABASE_URL` os testes usam credenciais fixas (`admin@wisecofre.io` / `admin123admin123`)
+> e os 6 testes de seguranca com acesso direto ao DB serao **skipped**.
+> Com `E2E_DATABASE_URL` os testes criam/destroem usuarios dedicados automaticamente.
 
 ### Variaveis de ambiente dos testes
 
 | Variavel | Default | Descricao |
 |---|---|---|
 | `E2E_BASE_URL` | `http://localhost:8003` | URL da aplicacao |
-| `E2E_DATABASE_URL` | `postgresql://wisecofre:wc-db-p4ss-2026@localhost:5433/wisecofre` | Conexao direta ao DB (para testes de seguranca) |
+| `E2E_DATABASE_URL` | *(vazio)* | Conexao direta ao DB — habilita usuarios dedicados e testes de seguranca |
 | `DJANGO_SETTINGS_MODULE` | `config.settings.test` | Settings do Django (necessario para pytest-django) |
 | `SECRET_KEY` | *(obrigatorio)* | Qualquer valor para pytest-django carregar |
 

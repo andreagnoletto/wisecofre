@@ -1,22 +1,96 @@
 """Comprehensive Playwright E2E tests for Wisecofre."""
 import re
+import os
 import uuid
 
 import pytest
 from playwright.sync_api import Page, expect
 
 
-import os
 BASE = os.environ.get("E2E_BASE_URL", "http://localhost:8003")
-ADMIN_EMAIL = "admin@wisecofre.io"
-ADMIN_PASS = "admin123admin123"
-USER_EMAIL = "joao@wisecofre.io"
-USER_PASS = "senha123senha123"
-
 UNIQUE = uuid.uuid4().hex[:6]
 
+ADMIN_EMAIL = os.environ.get("E2E_ADMIN_EMAIL", "admin@wisecofre.io")
+ADMIN_PASS = os.environ.get("E2E_ADMIN_PASS", "admin123admin123")
+USER_EMAIL = os.environ.get("E2E_USER_EMAIL", "joao@wisecofre.io")
+USER_PASS = os.environ.get("E2E_USER_PASS", "senha123senha123")
+USER_DISPLAY = "João Silva"
 
-def _login(page: Page, email: str = ADMIN_EMAIL, password: str = ADMIN_PASS):
+_CREATED_USERS = False
+_SENTINEL = object()
+
+
+def _db_conn():
+    """Return a psycopg connection if E2E_DATABASE_URL is set, else None."""
+    _db = os.environ.get("E2E_DATABASE_URL", "")
+    if not _db:
+        return None
+    try:
+        import psycopg
+        return psycopg.connect(_db, autocommit=True)
+    except Exception:
+        return None
+
+
+def setup_module():
+    """Create dedicated test users via DB if E2E_DATABASE_URL is set."""
+    global ADMIN_EMAIL, ADMIN_PASS, USER_EMAIL, USER_PASS, USER_DISPLAY, _CREATED_USERS
+
+    conn = _db_conn()
+    if conn is None:
+        return
+
+    try:
+        from django.contrib.auth.hashers import make_password
+    except ImportError:
+        conn.close()
+        return
+
+    ADMIN_EMAIL = f"testadm-{UNIQUE}@wisecofre.io"
+    ADMIN_PASS = "TestAdm1nP4ss2026x"
+    USER_EMAIL = f"testusr-{UNIQUE}@wisecofre.io"
+    USER_PASS = "TestUs3rP4ss2026x"
+    USER_DISPLAY = "TestUser E2E"
+
+    for email, password, uname, role, staff, first, last in [
+        (ADMIN_EMAIL, ADMIN_PASS, f"testadm{UNIQUE}", "ADMIN", True, "TestAdmin", "E2E"),
+        (USER_EMAIL, USER_PASS, f"testusr{UNIQUE}", "USER", False, "TestUser", "E2E"),
+    ]:
+        hashed = make_password(password, hasher="pbkdf2_sha256")
+        conn.execute("DELETE FROM accounts_user WHERE email = %s", (email,))
+        conn.execute(
+            """INSERT INTO accounts_user
+               (id, username, email, password, role, is_staff, is_superuser, is_active,
+                is_suspended, avatar_url, locale, first_name, last_name,
+                date_joined, created_at, modified_at)
+               VALUES (gen_random_uuid(), %s, %s, %s, %s, %s, %s, true,
+                false, '', 'pt-BR', %s, %s, now(), now(), now())""",
+            (uname, email, hashed, role, staff, staff, first, last),
+        )
+    conn.close()
+    _CREATED_USERS = True
+
+
+def teardown_module():
+    """Delete dedicated test users created by setup_module."""
+    if not _CREATED_USERS:
+        return
+    conn = _db_conn()
+    if conn is None:
+        return
+    try:
+        for email in (ADMIN_EMAIL, USER_EMAIL):
+            conn.execute("DELETE FROM accounts_user WHERE email = %s", (email,))
+        conn.close()
+    except Exception:
+        pass
+
+
+def _login(page: Page, email=_SENTINEL, password=_SENTINEL):
+    if email is _SENTINEL:
+        email = ADMIN_EMAIL
+    if password is _SENTINEL:
+        password = ADMIN_PASS
     page.goto(f"{BASE}/login/")
     if page.url == f"{BASE}/":
         return
@@ -37,7 +111,11 @@ def _logout(page: Page):
     page.context.clear_cookies()
 
 
-def _login_and_go(page: Page, path: str, email: str = ADMIN_EMAIL, password: str = ADMIN_PASS):
+def _login_and_go(page: Page, path: str, email=_SENTINEL, password=_SENTINEL):
+    if email is _SENTINEL:
+        email = ADMIN_EMAIL
+    if password is _SENTINEL:
+        password = ADMIN_PASS
     _login(page, email, password)
     page.goto(f"{BASE}{path}")
 
@@ -231,20 +309,20 @@ def test_group_add_member(page: Page):
     page.wait_for_selector("h4")
     select = page.locator('select[name="user_id"]')
     # Find the option containing joao
-    option = select.locator("option", has_text="joao@wisecofre.io")
+    option = select.locator("option", has_text=USER_EMAIL)
     option_value = option.get_attribute("value")
     select.select_option(value=option_value)
     with page.expect_navigation():
         page.get_by_role("button", name="Adicionar").click()
     expect(page.locator(".alert-success")).to_be_visible()
-    expect(page.get_by_role("cell", name="joao@wisecofre.io")).to_be_visible()
+    expect(page.get_by_role("cell", name=USER_EMAIL)).to_be_visible()
 
 
 def test_group_toggle_admin(page: Page):
     _login_and_go(page, "/groups/")
     page.locator(".card", has_text=f"Grupo {UNIQUE}").first.locator("a", has_text="Ver detalhes").click()
     page.wait_for_selector("h4")
-    joao_row = page.locator("tr", has_text="joao@wisecofre.io")
+    joao_row = page.locator("tr", has_text=USER_EMAIL)
     toggle_form = joao_row.locator('form[action*="toggle-admin"]')
     with page.expect_navigation():
         toggle_form.locator("button").click()
@@ -255,7 +333,7 @@ def test_group_remove_member(page: Page):
     _login_and_go(page, "/groups/")
     page.locator(".card", has_text=f"Grupo {UNIQUE}").first.locator("a", has_text="Ver detalhes").click()
     page.wait_for_selector("h4")
-    joao_row = page.locator("tr", has_text="joao@wisecofre.io")
+    joao_row = page.locator("tr", has_text=USER_EMAIL)
     page.on("dialog", lambda d: d.accept())
     remove_form = joao_row.locator('form[action*="remove-member"]')
     with page.expect_navigation():
@@ -363,7 +441,7 @@ def test_password_share_with_user(page: Page):
         page.locator('#shareModal button[type="submit"]').click()
 
     expect(page.locator(".alert-success")).to_be_visible()
-    expect(page.get_by_text("João Silva", exact=True)).to_be_visible()
+    expect(page.get_by_text(USER_DISPLAY, exact=True)).to_be_visible()
 
 
 def test_shared_password_visible_to_other_user(page: Page):
@@ -465,7 +543,7 @@ def test_file_unshare(page: Page):
     """Unshare the file from João."""
     _login_and_go(page, "/files/")
     page.get_by_role("link", name=f"file_{UNIQUE}.txt").first.click()
-    joao_entry = page.locator("li", has_text="João")
+    joao_entry = page.locator("li", has_text=USER_DISPLAY.split()[0])
     revoke_form = joao_entry.locator('form[action*="unshare"]')
     with page.expect_navigation():
         revoke_form.locator("button").click()
@@ -502,7 +580,7 @@ def test_file_delete(page: Page, tmp_path):
 def test_users_page_loads(page: Page):
     _login_and_go(page, "/users/")
     expect(page.get_by_role("button", name=re.compile("Convidar"))).to_be_visible()
-    expect(page.get_by_role("cell", name="admin@wisecofre.io")).to_be_visible()
+    expect(page.get_by_role("cell", name=ADMIN_EMAIL)).to_be_visible()
 
 
 def test_user_invite(page: Page):
@@ -575,54 +653,22 @@ def test_profile_update(page: Page):
     expect(page.locator('input[name="first_name"]')).to_have_value("Admin")
 
 
-_TEMP_PASS = "newadmin-long-password-123"
-
-
-def _reset_admin_password_via_db():
-    """Restore admin password via psycopg (when DB is accessible)."""
-    try:
-        import psycopg
-        from django.contrib.auth.hashers import make_password
-        hashed = make_password(ADMIN_PASS, hasher="pbkdf2_sha256")
-        _db = os.environ.get("E2E_DATABASE_URL", "")
-        if not _db:
-            return False
-        conn = psycopg.connect(_db)
-        cur = conn.cursor()
-        cur.execute("UPDATE accounts_user SET password = %s WHERE email = %s", (hashed, ADMIN_EMAIL))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception:
-        return False
-
-
-def _reset_admin_password_via_browser(page: Page):
-    """Restore admin password using the change-password form."""
-    page.goto(f"{BASE}/login/")
-    if "/login" in page.url:
-        page.fill('input[name="email"]', ADMIN_EMAIL)
-        page.fill('input[name="password"]', _TEMP_PASS)
-        page.click('button[type="submit"]')
-        page.wait_for_load_state("networkidle")
-    page.goto(f"{BASE}/profile/")
-    page.fill('#currentPwd', _TEMP_PASS)
+def test_profile_change_password(page: Page):
+    _login_and_go(page, "/profile/")
+    _tmp = "TempP4ssw0rd-Change-2026!"
+    page.fill('#currentPwd', ADMIN_PASS)
+    page.fill('#newPwd', _tmp)
+    page.fill('#confirmPwd', _tmp)
+    with page.expect_navigation():
+        page.get_by_role("button", name="Alterar Senha").click()
+    expect(page.locator(".alert-success")).to_be_visible()
+    # Change back immediately (session stays valid via update_session_auth_hash)
+    page.fill('#currentPwd', _tmp)
     page.fill('#newPwd', ADMIN_PASS)
     page.fill('#confirmPwd', ADMIN_PASS)
     with page.expect_navigation():
         page.get_by_role("button", name="Alterar Senha").click()
-
-
-def test_profile_change_password(page: Page):
-    _login_and_go(page, "/profile/")
-    page.fill('#currentPwd', ADMIN_PASS)
-    page.fill('#newPwd', _TEMP_PASS)
-    page.fill('#confirmPwd', _TEMP_PASS)
-    with page.expect_navigation():
-        page.get_by_role("button", name="Alterar Senha").click()
     expect(page.locator(".alert-success")).to_be_visible()
-    if not _reset_admin_password_via_db():
-        _reset_admin_password_via_browser(page)
 
 
 def test_profile_change_password_mismatch(page: Page):
@@ -844,8 +890,14 @@ def test_mfa_cleanup_before_tests(page: Page):
     if _db:
         import psycopg
         conn = psycopg.connect(_db, autocommit=True)
-        conn.execute("DELETE FROM mfa_backupcode")
-        conn.execute("DELETE FROM mfa_totpdevice")
+        conn.execute(
+            "DELETE FROM mfa_backupcode WHERE user_id IN (SELECT id FROM accounts_user WHERE email = %s)",
+            (ADMIN_EMAIL,),
+        )
+        conn.execute(
+            "DELETE FROM mfa_totpdevice WHERE user_id IN (SELECT id FROM accounts_user WHERE email = %s)",
+            (ADMIN_EMAIL,),
+        )
         conn.close()
     else:
         _login_and_go(page, "/profile/")
