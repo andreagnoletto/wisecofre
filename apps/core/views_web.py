@@ -694,7 +694,18 @@ def mfa_setup(request):
     TOTPDevice.objects.create(user=request.user, secret_key=secret)
     totp = pyotp.TOTP(secret)
     provisioning_uri = totp.provisioning_uri(name=request.user.email, issuer_name="Wisecofre")
-    return render(request, "mfa/setup.html", {"provisioning_uri": provisioning_uri, "secret": secret})
+
+    import qrcode, io, base64
+    img = qrcode.make(provisioning_uri, box_size=6, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_data_uri = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+    return render(request, "mfa/setup.html", {
+        "provisioning_uri": provisioning_uri,
+        "secret": secret,
+        "qr_data_uri": qr_data_uri,
+    })
 
 
 def mfa_verify(request):

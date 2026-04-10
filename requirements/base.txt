@@ -19,3 +19,4 @@ whitenoise>=6.8
 django-storages[s3]>=1.14
 boto3>=1.34
 Pillow>=11.0
+qrcode>=8.0
