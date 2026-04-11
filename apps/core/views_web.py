@@ -635,7 +635,6 @@ def file_create_text(request):
     return render(request, "files/create_text.html", {"folders": folders})
 
 
-@login_required
 _PREVIEW_EXTS = {
     ".txt", ".csv", ".json", ".xml", ".log", ".md", ".env",
     ".yml", ".yaml", ".cfg", ".ini", ".conf", ".toml", ".sh",
@@ -649,6 +648,7 @@ def _is_previewable(file_resource):
     return ext.lower() in _PREVIEW_EXTS
 
 
+@login_required
 def file_detail(request, pk):
     try:
         file, secret = FileService.get_or_deny(request.user, pk)
