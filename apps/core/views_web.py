@@ -553,6 +553,46 @@ def user_invite(request):
     return redirect("user_list")
 
 
+def invite_set_password(request, uidb64, token):
+    from django.contrib.auth.tokens import default_token_generator
+    from django.utils.http import urlsafe_base64_decode
+    from django.utils.encoding import force_str
+    from django.contrib.auth.password_validation import validate_password
+
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User._default_manager.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    valid = user is not None and default_token_generator.check_token(user, token)
+
+    if request.method == "POST" and valid:
+        pw1 = request.POST.get("new_password1", "")
+        pw2 = request.POST.get("new_password2", "")
+        errors = []
+        if pw1 != pw2:
+            errors.append("As senhas não conferem.")
+        if pw1:
+            try:
+                validate_password(pw1, user)
+            except ValidationError as e:
+                errors.extend(e.messages)
+        else:
+            errors.append("A senha não pode estar em branco.")
+        if errors:
+            return render(request, "registration/password_reset_confirm.html", {
+                "validlink": True, "errors": errors,
+            })
+        user.set_password(pw1)
+        user.save()
+        return redirect("login")
+
+    return render(request, "registration/password_reset_confirm.html", {
+        "validlink": valid,
+    })
+
+
 @login_required
 @user_passes_test(is_staff)
 @require_POST

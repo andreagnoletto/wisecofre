@@ -17,6 +17,7 @@ from apps.core.views_web import (
     file_detail,
     file_download,
     file_preview,
+    invite_set_password,
     file_list,
     file_share,
     file_unshare,
@@ -123,10 +124,7 @@ urlpatterns = [
     path("settings/sso/<uuid:pk>/delete/", admin_sso_delete, name="admin_sso_delete"),
 
     # ── Password Reset (usado no convite de usuário) ────────────────────
-    path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
-        template_name="registration/password_reset_confirm.html",
-        success_url="/login/",
-    ), name="password_reset_confirm"),
+    path("reset/<uidb64>/<token>/", invite_set_password, name="password_reset_confirm"),
 
     # ── Django Admin ──────────────────────────────────────────────────────
     path("admin/", admin.site.urls),
