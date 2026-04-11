@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
@@ -118,6 +119,12 @@ urlpatterns = [
     path("settings/test-email/", admin_test_email, name="admin_test_email"),
     path("settings/test-ldap/", admin_test_ldap, name="admin_test_ldap"),
     path("settings/sso/<uuid:pk>/delete/", admin_sso_delete, name="admin_sso_delete"),
+
+    # ── Password Reset (usado no convite de usuário) ────────────────────
+    path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
+        template_name="registration/password_reset_confirm.html",
+        success_url="/login/",
+    ), name="password_reset_confirm"),
 
     # ── Django Admin ──────────────────────────────────────────────────────
     path("admin/", admin.site.urls),

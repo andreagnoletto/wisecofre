@@ -592,7 +592,7 @@ def test_user_invite(page: Page):
     page.fill('#inviteLast', "Teste")
     with page.expect_navigation():
         page.locator('#inviteModal button[type="submit"]').click()
-    expect(page.locator(".alert-success")).to_be_visible()
+    expect(page.locator(".alert-success, .alert-warning")).to_be_visible()
     expect(page.get_by_text(f"convidado_{UNIQUE}@wisecofre.io").first).to_be_visible()
 
 

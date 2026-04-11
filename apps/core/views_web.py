@@ -483,12 +483,44 @@ def user_invite(request):
         messages.error(request, "Usuário já existe.")
     else:
         import secrets
-        User.objects.create_user(
+        from django.contrib.auth.tokens import default_token_generator
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+        new_user = User.objects.create_user(
             username=email.split("@")[0], email=email,
             password=secrets.token_urlsafe(16),
             first_name=first_name, last_name=last_name, role=role,
         )
-        messages.success(request, f"Convite enviado para {email}.")
+        app_name = get_config("APP_NAME", "Wisecofre")
+        base_url = get_config("APP_BASE_URL", "").rstrip("/") or request.build_absolute_uri("/").rstrip("/")
+        uid = urlsafe_base64_encode(force_bytes(new_user.pk))
+        token = default_token_generator.make_token(new_user)
+        reset_url = f"{base_url}/reset/{uid}/{token}/"
+        body = (
+            f"Olá {first_name or email},\n\n"
+            f"Você foi convidado(a) para o {app_name}.\n\n"
+            f"Defina sua senha acessando o link abaixo:\n{reset_url}\n\n"
+            f"Este link expira em 3 dias.\n\n"
+            f"— Equipe {app_name}"
+        )
+        body_html = (
+            f"<p>Olá <strong>{escape(first_name or email)}</strong>,</p>"
+            f"<p>Você foi convidado(a) para o <strong>{escape(app_name)}</strong>.</p>"
+            f"<p>Defina sua senha clicando no botão abaixo:</p>"
+            f'<p><a href="{reset_url}" style="display:inline-block;padding:12px 24px;'
+            f'background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">'
+            f"Definir Senha</a></p>"
+            f"<p><small>Ou copie este link: {reset_url}</small></p>"
+            f"<p>Este link expira em 3 dias.</p>"
+            f"<p>— Equipe {escape(app_name)}</p>"
+        )
+        try:
+            _send_smtp(email, f"{app_name} — Você foi convidado!", body, body_html)
+            messages.success(request, f"Convite enviado para {email}.")
+        except Exception as e:
+            import logging
+            logging.getLogger("wisecofre").warning("Invite email failed: %s", e)
+            messages.warning(request, f"Usuário criado, mas não foi possível enviar email: {e}")
     return redirect("user_list")
 
 
@@ -898,39 +930,52 @@ def admin_test_storage(request):
         return HttpResponse(f'<span class="text-danger"><i class="bi bi-x-circle"></i> Erro: {escape(str(e))}</span>')
 
 
-@login_required
-@user_passes_test(is_staff)
-@require_POST
-def admin_test_email(request):
+def _send_smtp(to_addr, subject, body_text, body_html=None):
+    """Send an email using SMTP settings from SystemConfiguration. Raises on failure."""
     import smtplib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
     host = get_config("SMTP_HOST", "")
+    if not host:
+        raise ValueError("SMTP Host não configurado nas Configurações.")
     port = int(get_config("SMTP_PORT", 587))
     use_tls = get_config("SMTP_USE_TLS", True)
     user = get_config("SMTP_USER", "")
     password = get_config("SMTP_PASSWORD", "")
     sender = get_config("EMAIL_SENDER_ADDRESS", "")
-    if not host:
-        return HttpResponse('<span class="text-warning"><i class="bi bi-exclamation-circle"></i> SMTP Host não configurado</span>')
-    try:
-        srv = smtplib.SMTP(host, port, timeout=10)
+    sender_name = get_config("EMAIL_SENDER_NAME", "Wisecofre")
+    if not sender:
+        raise ValueError("Email do Remetente não configurado nas Configurações.")
+    from_addr = f"{sender_name} <{sender}>" if sender_name else sender
+    if body_html:
+        msg = MIMEMultipart("alternative")
+        msg.attach(MIMEText(body_text, "plain", "utf-8"))
+        msg.attach(MIMEText(body_html, "html", "utf-8"))
+    else:
+        msg = MIMEText(body_text, "plain", "utf-8")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    srv = smtplib.SMTP(host, port, timeout=15)
+    srv.ehlo()
+    if use_tls and str(use_tls).lower() not in ("false", "0"):
+        srv.starttls()
         srv.ehlo()
-        if use_tls and use_tls is not False and str(use_tls).lower() not in ("false", "0"):
-            srv.starttls()
-            srv.ehlo()
-        if user and password:
-            srv.login(user, password)
-        to_addr = request.POST.get("to", "").strip() or request.user.email
-        if to_addr and sender:
-            from email.mime.text import MIMEText
-            msg = MIMEText("Este é um email de teste do Wisecofre. Se você recebeu, a configuração SMTP está funcionando.")
-            msg["Subject"] = "Wisecofre — Teste de Email"
-            msg["From"] = sender
-            msg["To"] = to_addr
-            srv.sendmail(sender, [to_addr], msg.as_string())
-            srv.quit()
-            return HttpResponse(f'<span class="text-success"><i class="bi bi-check-circle"></i> Conexão OK — email enviado para {escape(to_addr)}</span>')
-        srv.quit()
-        return HttpResponse('<span class="text-success"><i class="bi bi-check-circle"></i> Conexão SMTP OK</span>')
+    if user and password:
+        srv.login(user, password)
+    srv.sendmail(sender, [to_addr], msg.as_string())
+    srv.quit()
+
+
+@login_required
+@user_passes_test(is_staff)
+@require_POST
+def admin_test_email(request):
+    to_addr = request.POST.get("to", "").strip() or request.user.email
+    try:
+        _send_smtp(to_addr, "Wisecofre — Teste de Email",
+                   "Este é um email de teste do Wisecofre. Se você recebeu, a configuração SMTP está funcionando.")
+        return HttpResponse(f'<span class="text-success"><i class="bi bi-check-circle"></i> Email enviado para {escape(to_addr)}</span>')
     except Exception as e:
         import logging
         logging.getLogger("wisecofre").exception("Email test failed")
