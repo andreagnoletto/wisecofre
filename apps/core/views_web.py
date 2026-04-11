@@ -919,8 +919,7 @@ def admin_test_email(request):
             srv.ehlo()
         if user and password:
             srv.login(user, password)
-        # Send test email to the logged-in admin
-        to_addr = request.user.email
+        to_addr = request.POST.get("to", "").strip() or request.user.email
         if to_addr and sender:
             from email.mime.text import MIMEText
             msg = MIMEText("Este é um email de teste do Wisecofre. Se você recebeu, a configuração SMTP está funcionando.")
