@@ -247,5 +247,5 @@ X_FRAME_OPTIONS = "DENY"
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
-APP_BASE_URL = env("APP_BASE_URL", default="http://localhost:8000")
+APP_BASE_URL = env("APP_BASE_URL", default="") or env("SERVICE_URL_WEB", default="http://localhost:8000")
 APP_NAME = env("APP_NAME", default="Wisecofre")

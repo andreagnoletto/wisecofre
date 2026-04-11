@@ -9,7 +9,8 @@ x-django-env: &django-env
   STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-wc-minio-secret-key-muito-longa-2026}
   MINIO_BUCKET_NAME: ${MINIO_BUCKET_NAME:-wisecofre-files}
   MINIO_USE_HTTPS: ${MINIO_USE_HTTPS:-False}
-  APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8003}
+  APP_BASE_URL: ${APP_BASE_URL:-}
+  SERVICE_URL_WEB: ${SERVICE_URL_WEB:-http://localhost:8003}
   APP_NAME: ${APP_NAME:-Wisecofre}
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:-wc-encr1pt10n-k3y-ch4ng3-m3-2026}
   CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-http://localhost:8003,https://cofre.wisedoc.com.br}
