@@ -822,7 +822,7 @@ def test_settings_save_storage(page: Page):
 def test_settings_test_storage_connection(page: Page):
     _login_and_go(page, "/settings/")
     page.get_by_role("button", name="Storage").click()
-    page.locator('button:has-text("Testar Conexão")').first.click()
+    page.locator('button:has-text("Testar Conexão"):visible').first.click()
     page.wait_for_function(
         "() => document.querySelector('[x-html=\"storageResult\"]')?.innerHTML.trim().length > 0",
         timeout=10000,

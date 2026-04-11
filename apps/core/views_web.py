@@ -901,9 +901,50 @@ def admin_test_storage(request):
 @login_required
 @user_passes_test(is_staff)
 @require_POST
+def admin_test_email(request):
+    import smtplib
+    host = get_config("SMTP_HOST", "")
+    port = int(get_config("SMTP_PORT", 587))
+    use_tls = get_config("SMTP_USE_TLS", True)
+    user = get_config("SMTP_USER", "")
+    password = get_config("SMTP_PASSWORD", "")
+    sender = get_config("EMAIL_SENDER_ADDRESS", "")
+    if not host:
+        return HttpResponse('<span class="text-warning"><i class="bi bi-exclamation-circle"></i> SMTP Host não configurado</span>')
+    try:
+        srv = smtplib.SMTP(host, port, timeout=10)
+        srv.ehlo()
+        if use_tls and use_tls is not False and str(use_tls).lower() not in ("false", "0"):
+            srv.starttls()
+            srv.ehlo()
+        if user and password:
+            srv.login(user, password)
+        # Send test email to the logged-in admin
+        to_addr = request.user.email
+        if to_addr and sender:
+            from email.mime.text import MIMEText
+            msg = MIMEText("Este é um email de teste do Wisecofre. Se você recebeu, a configuração SMTP está funcionando.")
+            msg["Subject"] = "Wisecofre — Teste de Email"
+            msg["From"] = sender
+            msg["To"] = to_addr
+            srv.sendmail(sender, [to_addr], msg.as_string())
+            srv.quit()
+            return HttpResponse(f'<span class="text-success"><i class="bi bi-check-circle"></i> Conexão OK — email enviado para {escape(to_addr)}</span>')
+        srv.quit()
+        return HttpResponse('<span class="text-success"><i class="bi bi-check-circle"></i> Conexão SMTP OK</span>')
+    except Exception as e:
+        import logging
+        logging.getLogger("wisecofre").exception("Email test failed")
+        return HttpResponse(f'<span class="text-danger"><i class="bi bi-x-circle"></i> Erro: {escape(str(e))}</span>')
+
+
+@login_required
+@user_passes_test(is_staff)
+@require_POST
 def admin_test_ldap(request):
     return HttpResponse(
-        '<span class="text-warning"><i class="bi bi-exclamation-circle"></i> LDAP não configurado neste ambiente</span>'
+        '<span class="text-info"><i class="bi bi-info-circle"></i> '
+        'LDAP está em Beta. Configure um servidor LDAP externo para testar a conexão.</span>'
     )
 
 

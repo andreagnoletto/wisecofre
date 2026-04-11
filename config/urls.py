@@ -6,6 +6,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from apps.core.views_web import (
     admin_settings,
     admin_sso_delete,
+    admin_test_email,
     admin_test_ldap,
     admin_test_storage,
     audit_export_csv,
@@ -114,6 +115,7 @@ urlpatterns = [
     # ── Admin settings ────────────────────────────────────────────────────
     path("settings/", admin_settings, name="admin_settings"),
     path("settings/test-storage/", admin_test_storage, name="admin_test_storage"),
+    path("settings/test-email/", admin_test_email, name="admin_test_email"),
     path("settings/test-ldap/", admin_test_ldap, name="admin_test_ldap"),
     path("settings/sso/<uuid:pk>/delete/", admin_sso_delete, name="admin_sso_delete"),
 
