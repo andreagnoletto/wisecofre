@@ -666,9 +666,13 @@ def file_detail(request, pk):
 @login_required
 def file_preview(request, pk):
     try:
-        content, filename = FileService.download(request.user, pk)
+        fr, _ = FileService.get_or_deny(request.user, pk)
     except PermissionDenied:
         return JsonResponse({"error": "Sem permissão."}, status=403)
+    if not _is_previewable(fr):
+        return JsonResponse({"error": "Tipo de arquivo não suporta visualização."}, status=400)
+    try:
+        content, filename = FileService.download(request.user, pk)
     except ValidationError as e:
         return JsonResponse({"error": str(e.message if hasattr(e, "message") else e)}, status=400)
     if len(content) > 512_000:
@@ -678,8 +682,7 @@ def file_preview(request, pk):
     except UnicodeDecodeError:
         return JsonResponse({"error": "Arquivo não é texto legível."}, status=400)
     FileAccessLog.objects.create(
-        file_resource=FileService.get_or_deny(request.user, pk)[0],
-        user=request.user, action="view",
+        file_resource=fr, user=request.user, action="view",
         ip_address=request.META.get("REMOTE_ADDR", ""),
     )
     return JsonResponse({"content": text, "filename": filename})
