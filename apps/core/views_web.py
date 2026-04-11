@@ -1,3 +1,4 @@
+from django.conf import settings as django_settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -57,9 +58,15 @@ CONFIG_DEFAULTS = {
 
 def get_config(key, default=None):
     try:
-        return SystemConfiguration.objects.get(key=key).value
+        val = SystemConfiguration.objects.get(key=key).value
+        if val not in (None, ""):
+            return val
     except SystemConfiguration.DoesNotExist:
-        return default if default is not None else CONFIG_DEFAULTS.get(key)
+        pass
+    env_val = getattr(django_settings, key, None)
+    if env_val not in (None, ""):
+        return env_val
+    return default if default is not None else CONFIG_DEFAULTS.get(key)
 
 
 def is_staff(user):
