@@ -62,7 +62,21 @@
                     </tbody>
                 </table>
 
-                <div class="d-grid gap-2">
+                <div class="d-grid gap-2" x-data="filePreview()">
+                    {% if is_previewable %}
+                    <button class="btn btn-outline-primary btn-lg" @click="loadPreview()" :disabled="loading">
+                        <template x-if="!shown">
+                            <span><i class="bi bi-eye me-2"></i><span x-show="!loading">Visualizar</span><span x-show="loading"><span class="spinner-border spinner-border-sm me-1"></span> Carregando...</span></span>
+                        </template>
+                        <template x-if="shown">
+                            <span><i class="bi bi-eye-slash me-2"></i>Ocultar</span>
+                        </template>
+                    </button>
+                    <div x-show="shown" x-cloak class="border rounded p-3 bg-light" style="max-height:500px; overflow:auto;">
+                        <div x-show="error" class="text-danger small" x-text="error"></div>
+                        <pre x-show="content" class="mb-0" style="white-space:pre-wrap; word-break:break-word; font-size:0.85rem;" x-text="content"></pre>
+                    </div>
+                    {% endif %}
                     <a href="{% url 'file_download' file.pk %}" class="btn btn-primary btn-lg">
                         <i class="bi bi-lock me-2"></i>Baixar e Descriptografar
                     </a>
@@ -70,6 +84,28 @@
                         <i class="bi bi-trash me-2"></i>Excluir arquivo
                     </button>
                 </div>
+
+                {% if is_previewable %}
+                <script>
+                function filePreview() {
+                    return {
+                        shown: false, loading: false, content: '', error: '',
+                        async loadPreview() {
+                            if (this.shown) { this.shown = false; return; }
+                            if (this.content) { this.shown = true; return; }
+                            this.loading = true; this.error = '';
+                            try {
+                                const resp = await fetch('{% url "file_preview" file.pk %}');
+                                const data = await resp.json();
+                                if (resp.ok) { this.content = data.content; this.shown = true; }
+                                else { this.error = data.error || 'Erro ao carregar.'; this.shown = true; }
+                            } catch(e) { this.error = 'Erro de rede.'; this.shown = true; }
+                            this.loading = false;
+                        }
+                    }
+                }
+                </script>
+                {% endif %}
             </div>
         </div>
 

@@ -636,6 +636,19 @@ def file_create_text(request):
 
 
 @login_required
+_PREVIEW_EXTS = {
+    ".txt", ".csv", ".json", ".xml", ".log", ".md", ".env",
+    ".yml", ".yaml", ".cfg", ".ini", ".conf", ".toml", ".sh",
+    ".bat", ".ps1", ".py", ".js", ".html", ".css", ".sql",
+}
+
+
+def _is_previewable(file_resource):
+    import os
+    _, ext = os.path.splitext(file_resource.original_name_encrypted)
+    return ext.lower() in _PREVIEW_EXTS
+
+
 def file_detail(request, pk):
     try:
         file, secret = FileService.get_or_deny(request.user, pk)
@@ -646,7 +659,30 @@ def file_detail(request, pk):
     return render(request, "files/detail.html", {
         "file": file, "secret": secret,
         "access_logs": access_logs, "shared_users": shared_secrets,
+        "is_previewable": _is_previewable(file),
     })
+
+
+@login_required
+def file_preview(request, pk):
+    try:
+        content, filename = FileService.download(request.user, pk)
+    except PermissionDenied:
+        return JsonResponse({"error": "Sem permissão."}, status=403)
+    except ValidationError as e:
+        return JsonResponse({"error": str(e.message if hasattr(e, "message") else e)}, status=400)
+    if len(content) > 512_000:
+        return JsonResponse({"error": "Arquivo muito grande para visualização (max 500KB)."}, status=400)
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        return JsonResponse({"error": "Arquivo não é texto legível."}, status=400)
+    FileAccessLog.objects.create(
+        file_resource=FileService.get_or_deny(request.user, pk)[0],
+        user=request.user, action="view",
+        ip_address=request.META.get("REMOTE_ADDR", ""),
+    )
+    return JsonResponse({"content": text, "filename": filename})
 
 
 @login_required
