@@ -930,7 +930,9 @@ def admin_settings(request):
     for c in SystemConfiguration.objects.all():
         configs[c.key] = c.value
     for key, default in CONFIG_DEFAULTS.items():
-        configs.setdefault(key, default)
+        if key not in configs or configs[key] in (None, ""):
+            env_val = getattr(django_settings, key, None)
+            configs[key] = env_val if env_val not in (None, "") else default
     sso_providers = SSOProvider.objects.all().order_by("-created_at")
     return render(request, "admin_settings/index.html", {
         "configs": configs, "sso_providers": sso_providers,
