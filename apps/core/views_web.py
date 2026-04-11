@@ -521,7 +521,7 @@ def user_invite(request):
             first_name=first_name, last_name=last_name, role=role,
         )
         app_name = get_config("APP_NAME", "Wisecofre")
-        base_url = get_config("APP_BASE_URL", "").rstrip("/") or request.build_absolute_uri("/").rstrip("/")
+        base_url = request.build_absolute_uri("/").rstrip("/")
         uid = urlsafe_base64_encode(force_bytes(new_user.pk))
         token = default_token_generator.make_token(new_user)
         reset_url = f"{base_url}/reset/{uid}/{token}/"
@@ -551,46 +551,6 @@ def user_invite(request):
             logging.getLogger("wisecofre").warning("Invite email failed: %s", e)
             messages.warning(request, f"Usuário criado, mas não foi possível enviar email: {e}")
     return redirect("user_list")
-
-
-def invite_set_password(request, uidb64, token):
-    from django.contrib.auth.tokens import default_token_generator
-    from django.utils.http import urlsafe_base64_decode
-    from django.utils.encoding import force_str
-    from django.contrib.auth.password_validation import validate_password
-
-    try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
-        user = User._default_manager.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-
-    valid = user is not None and default_token_generator.check_token(user, token)
-
-    if request.method == "POST" and valid:
-        pw1 = request.POST.get("new_password1", "")
-        pw2 = request.POST.get("new_password2", "")
-        errors = []
-        if pw1 != pw2:
-            errors.append("As senhas não conferem.")
-        if pw1:
-            try:
-                validate_password(pw1, user)
-            except ValidationError as e:
-                errors.extend(e.messages)
-        else:
-            errors.append("A senha não pode estar em branco.")
-        if errors:
-            return render(request, "registration/password_reset_confirm.html", {
-                "validlink": True, "errors": errors,
-            })
-        user.set_password(pw1)
-        user.save()
-        return redirect("login")
-
-    return render(request, "registration/password_reset_confirm.html", {
-        "validlink": valid,
-    })
 
 
 @login_required
