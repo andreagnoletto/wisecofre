@@ -94,22 +94,27 @@
     {% endif %}
 
     <!-- Create Folder Modal -->
-    <div class="modal fade" id="createFolderModal" tabindex="-1">
+    <div class="modal fade" id="createFolderModal" tabindex="-1" x-data="folderModal()">
         <div class="modal-dialog">
-            <form method="post" action="{% if current_folder %}{% url 'folder_detail' current_folder.id %}{% else %}{% url 'folder_list' %}{% endif %}" class="modal-content">
-                {% csrf_token %}
+            <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Nova Pasta</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="alert alert-danger py-2 small" x-show="error" x-cloak>
+                        <i class="bi bi-exclamation-triangle me-1"></i> <span x-text="error"></span>
+                        <template x-if="suggestion">
+                            <span> Sugestão: <a href="#" class="fw-bold" @click.prevent="name = suggestion; error = ''; suggestion = ''" x-text="suggestion"></a></span>
+                        </template>
+                    </div>
                     <div class="mb-3">
                         <label for="folderName" class="form-label">Nome</label>
-                        <input type="text" class="form-control" id="folderName" name="name" required autofocus>
+                        <input type="text" class="form-control" :class="{ 'is-invalid': error }" id="folderName" x-model="name" required autofocus>
                     </div>
                     <div class="mb-3">
                         <label for="folderParent" class="form-label">Pasta pai (opcional)</label>
-                        <select class="form-select" id="folderParent" name="parent">
+                        <select class="form-select" id="folderParent" x-model="parent">
                             <option value="">— Raiz —</option>
                             {% for f in all_folders %}
                             <option value="{{ f.id }}" {% if current_folder and f.id == current_folder.id %}selected{% endif %}>{{ f.name }}</option>
@@ -119,10 +124,46 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Criar</button>
+                    <button type="button" class="btn btn-primary" @click="submit()" :disabled="saving">
+                        <span x-show="!saving">Criar</span>
+                        <span x-show="saving"><span class="spinner-border spinner-border-sm me-1"></span> Criando...</span>
+                    </button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
+
+<script>
+function folderModal() {
+    return {
+        name: '', parent: '{% if current_folder %}{{ current_folder.id }}{% endif %}',
+        error: '', suggestion: '', saving: false,
+        async submit() {
+            this.error = ''; this.suggestion = '';
+            if (!this.name.trim()) { this.error = 'Nome é obrigatório.'; return; }
+            this.saving = true;
+            const url = '{% if current_folder %}{% url "folder_detail" current_folder.id %}{% else %}{% url "folder_list" %}{% endif %}';
+            const fd = new FormData();
+            fd.append('name', this.name.trim());
+            fd.append('parent', this.parent);
+            fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            try {
+                const resp = await fetch(url, {
+                    method: 'POST', body: fd,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                if (resp.ok) {
+                    location.reload();
+                } else {
+                    const data = await resp.json();
+                    this.error = data.error || 'Erro ao criar pasta.';
+                    this.suggestion = this.name.trim() + ' (2)';
+                    this.saving = false;
+                }
+            } catch(e) { this.error = 'Erro de rede.'; this.saving = false; }
+        }
+    }
+}
+</script>
 {% endblock %}

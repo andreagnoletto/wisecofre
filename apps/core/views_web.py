@@ -2,7 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse, HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.html import escape
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -282,6 +282,7 @@ def _user_folders(user, **extra_filters):
 
 @login_required
 def folder_list(request):
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if request.method == "POST":
         try:
             FolderService.create(
@@ -289,9 +290,14 @@ def folder_list(request):
                 name=request.POST.get("name", "").strip(),
                 parent_id=request.POST.get("parent") or None,
             )
+            if ajax:
+                return JsonResponse({"ok": True})
             messages.success(request, "Pasta criada.")
         except ValidationError as e:
-            messages.error(request, str(e.message if hasattr(e, "message") else e))
+            msg = str(e.message if hasattr(e, "message") else e)
+            if ajax:
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
         return redirect("folder_list")
     folders = _user_folders(request.user, parent__isnull=True).prefetch_related("children")
     all_folders = _user_folders(request.user)
@@ -304,6 +310,7 @@ def folder_detail(request, pk):
     if not request.user.is_staff and folder.created_by != request.user:
         messages.error(request, "Sem permissão.")
         return redirect("folder_list")
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if request.method == "POST":
         try:
             FolderService.create(
@@ -311,9 +318,14 @@ def folder_detail(request, pk):
                 name=request.POST.get("name", "").strip(),
                 parent_id=request.POST.get("parent") or None,
             )
+            if ajax:
+                return JsonResponse({"ok": True})
             messages.success(request, "Pasta criada.")
         except ValidationError as e:
-            messages.error(request, str(e.message if hasattr(e, "message") else e))
+            msg = str(e.message if hasattr(e, "message") else e)
+            if ajax:
+                return JsonResponse({"ok": False, "error": msg}, status=400)
+            messages.error(request, msg)
         return redirect("folder_detail", pk=pk)
     resources = Resource.objects.filter(folder=folder, deleted_at__isnull=True)
     user = request.user
@@ -359,15 +371,23 @@ def folder_delete(request, pk):
 
 @login_required
 def group_list(request):
+    ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
+        error = None
         if not name:
-            messages.error(request, "Nome do grupo é obrigatório.")
+            error = "Nome do grupo é obrigatório."
         elif Group.objects.filter(name=name, deleted_at__isnull=True).exists():
-            messages.error(request, "Já existe um grupo com este nome.")
+            error = "Já existe um grupo com este nome."
+        if error:
+            if ajax:
+                return JsonResponse({"ok": False, "error": error}, status=400)
+            messages.error(request, error)
         else:
             group = Group.objects.create(name=name, created_by=request.user)
             GroupUser.objects.create(group=group, user=request.user, is_admin=True)
+            if ajax:
+                return JsonResponse({"ok": True})
             messages.success(request, f'Grupo "{name}" criado.')
         return redirect("group_list")
     groups = GroupService.list_for_user(request.user)
