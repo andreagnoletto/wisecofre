@@ -361,12 +361,14 @@ def folder_delete(request, pk):
 def group_list(request):
     if request.method == "POST":
         name = request.POST.get("name", "").strip()
-        if name:
+        if not name:
+            messages.error(request, "Nome do grupo é obrigatório.")
+        elif Group.objects.filter(name=name, deleted_at__isnull=True).exists():
+            messages.error(request, "Já existe um grupo com este nome.")
+        else:
             group = Group.objects.create(name=name, created_by=request.user)
             GroupUser.objects.create(group=group, user=request.user, is_admin=True)
             messages.success(request, f'Grupo "{name}" criado.')
-        else:
-            messages.error(request, "Nome do grupo é obrigatório.")
         return redirect("group_list")
     groups = GroupService.list_for_user(request.user)
     return render(request, "groups/list.html", {"groups": groups})
