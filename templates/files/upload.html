@@ -43,7 +43,7 @@
                         <select name="folder" class="form-select form-select-sm">
                             <option value="">Nenhuma pasta</option>
                             {% for folder in folders %}
-                            <option value="{{ folder.pk }}">{{ folder.name }}</option>
+                            <option value="{{ folder.pk }}" {% if selected_folder == folder.pk|stringformat:"s" %}selected{% endif %}>{{ folder.name }}</option>
                             {% endfor %}
                         </select>
                     </div>

@@ -75,12 +75,31 @@
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{% url 'password_detail' resource.pk %}"><i class="bi bi-eye me-2"></i>Ver</a></li>
+                                {% if resource.username %}
                                 <li>
-                                    <button class="dropdown-item" onclick="copySecret({{ resource.pk }})">
-                                        <i class="bi bi-clipboard-check me-2"></i>Copiar Senha
+                                    <button type="button" class="dropdown-item" onclick="copyToClipboard('{{ resource.username|escapejs }}','Usuário copiado')">
+                                        <i class="bi bi-person me-2"></i>Copiar usuário
                                     </button>
                                 </li>
-                                <li><a class="dropdown-item" href="{% url 'password_detail' resource.pk %}"><i class="bi bi-share me-2"></i>Compartilhar</a></li>
+                                {% endif %}
+                                <li>
+                                    <button type="button" class="dropdown-item" onclick="copyPasswordSecret('{% url 'password_secret' resource.pk %}')">
+                                        <i class="bi bi-clipboard-check me-2"></i>Copiar senha
+                                    </button>
+                                </li>
+                                {% if resource.uri %}
+                                <li>
+                                    <button type="button" class="dropdown-item" onclick="copyToClipboard('{{ resource.uri|escapejs }}','URL copiada')">
+                                        <i class="bi bi-link-45deg me-2"></i>Copiar URL
+                                    </button>
+                                </li>
+                                {% endif %}
+                                <li>
+                                    <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#shareModal"
+                                            data-share-url="{% url 'password_share' resource.pk %}" data-resource-name="{{ resource.name|escapejs }}">
+                                        <i class="bi bi-share me-2"></i>Compartilhar
+                                    </button>
+                                </li>
                                 <li><a class="dropdown-item" href="{% url 'password_edit' resource.pk %}"><i class="bi bi-pencil me-2"></i>Editar</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
@@ -108,6 +127,79 @@
         </table>
     </div>
 </div>
+
+<!-- Share Modal (reutilizavel: a acao e o titulo sao definidos ao abrir) -->
+<div class="modal fade" id="shareModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="post" id="shareModalForm" class="modal-content">
+            {% csrf_token %}
+            <div class="modal-header">
+                <h5 class="modal-title">Compartilhar <span id="shareModalName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="btn-group w-100 mb-3" role="group">
+                    <input type="radio" class="btn-check" name="share_type" id="lst-user" value="user" checked>
+                    <label class="btn btn-outline-primary" for="lst-user"><i class="bi bi-person me-1"></i>Usuário</label>
+                    <input type="radio" class="btn-check" name="share_type" id="lst-group" value="group">
+                    <label class="btn btn-outline-primary" for="lst-group"><i class="bi bi-people me-1"></i>Grupo</label>
+                </div>
+                <div class="mb-3" data-share-target="user">
+                    <label for="lst-user-email" class="form-label fw-semibold">Usuário</label>
+                    <input type="text" name="user_email" id="lst-user-email" class="form-control" placeholder="E-mail do usuário">
+                </div>
+                <div class="mb-3 d-none" data-share-target="group">
+                    <label for="lst-group-id" class="form-label fw-semibold">Grupo</label>
+                    <select name="group_id" id="lst-group-id" class="form-select">
+                        {% for g in shareable_groups %}
+                        <option value="{{ g.pk }}">{{ g.name }}</option>
+                        {% empty %}
+                        <option value="" disabled>Você não participa de nenhum grupo</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="lst-perm" class="form-label fw-semibold">Permissão</label>
+                    <select name="permission" id="lst-perm" class="form-select">
+                        <option value="read">Leitura</option>
+                        <option value="write">Leitura e escrita</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-share me-1"></i> Compartilhar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+(function () {
+    var modal = document.getElementById('shareModal');
+    if (!modal) return;
+    var form = document.getElementById('shareModalForm');
+    var nameEl = document.getElementById('shareModalName');
+    function syncType() {
+        var type = modal.querySelector('input[name="share_type"]:checked').value;
+        modal.querySelectorAll('[data-share-target]').forEach(function (el) {
+            var on = el.getAttribute('data-share-target') === type;
+            el.classList.toggle('d-none', !on);
+            el.querySelectorAll('input, select').forEach(function (f) { f.disabled = !on; });
+        });
+    }
+    modal.addEventListener('show.bs.modal', function (event) {
+        var btn = event.relatedTarget;
+        if (!btn) return;
+        form.action = btn.getAttribute('data-share-url');
+        nameEl.textContent = '"' + (btn.getAttribute('data-resource-name') || '') + '"';
+        modal.querySelector('#lst-user').checked = true;
+        syncType();
+    });
+    modal.querySelectorAll('input[name="share_type"]').forEach(function (r) {
+        r.addEventListener('change', syncType);
+    });
+})();
+</script>
 
 <!-- Pagination -->
 {% if page_obj.has_other_pages %}

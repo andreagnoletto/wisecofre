@@ -17,14 +17,40 @@
             {% if request.GET.category %}<input type="hidden" name="category" value="{{ request.GET.category }}">{% endif %}
             <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="Buscar arquivos..." style="min-width:200px;">
         </form>
-        <a href="{% url 'file_create_text' %}" class="btn btn-sm btn-outline-primary">
+        <a href="{% url 'file_create_text' %}{% if current_folder %}?folder={{ current_folder.id }}{% endif %}" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-file-earmark-text me-1"></i>Novo Texto
         </a>
-        <a href="{% url 'file_upload' %}" class="btn btn-sm btn-primary">
+        <a href="{% url 'file_upload' %}{% if current_folder %}?folder={{ current_folder.id }}{% endif %}" class="btn btn-sm btn-primary">
             <i class="bi bi-plus-lg me-1"></i>Upload
         </a>
     </div>
 </div>
+
+<!-- Navegação por pastas -->
+{% if current_folder %}
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'file_list' %}"><i class="bi bi-hdd-stack me-1"></i>Arquivos</a></li>
+        {% if current_folder.parent %}
+        <li class="breadcrumb-item"><a href="?folder={{ current_folder.parent.id }}">{{ current_folder.parent.name }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">{{ current_folder.name }}</li>
+    </ol>
+</nav>
+{% endif %}
+
+{% if folders %}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="list-group list-group-flush">
+        {% for folder in folders %}
+        <a href="?folder={{ folder.id }}" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-2">
+            <i class="bi bi-folder-fill text-warning"></i>
+            <span class="fw-medium">{{ folder.name }}</span>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 {% if files %}
 <div class="card border-0 shadow-sm">

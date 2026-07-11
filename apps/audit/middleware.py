@@ -88,6 +88,12 @@ class AuditMiddleware(MiddlewareMixin):
         context = {}
         if match.kwargs:
             context["params"] = {k: str(v) for k, v in match.kwargs.items()}
+        # Em login (inclusive tentativas anônimas) registra o e-mail informado,
+        # nunca a senha, para dar contexto a quem não tem usuário associado.
+        if route_name == "login" and request.method == "POST":
+            email = (request.POST.get("email") or "").strip()
+            if email:
+                context["email"] = email
 
         try:
             ActionLog.objects.create(

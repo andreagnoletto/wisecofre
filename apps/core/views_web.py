@@ -171,6 +171,7 @@ def password_list(request):
     resources = [s.resource for s in secrets]
     return render(request, "passwords/list.html", {
         "resources": resources, "search": search, "current_filter": filter_type,
+        "shareable_groups": GroupService.list_for_user(request.user),
     })
 
 
@@ -194,7 +195,10 @@ def password_create(request):
             messages.error(request, str(e.message if hasattr(e, "message") else e))
             return redirect("password_create")
     folders = Folder.objects.filter(deleted_at__isnull=True)
-    return render(request, "passwords/form.html", {"form_title": "Nova Senha", "folders": folders})
+    return render(request, "passwords/form.html", {
+        "form_title": "Nova Senha", "folders": folders,
+        "selected_folder": request.GET.get("folder", ""),
+    })
 
 
 def _group_access_list(permissions):
@@ -320,6 +324,17 @@ def password_unshare_group(request, pk):
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     return redirect("password_detail", pk=pk)
+
+
+@login_required
+def password_secret(request, pk):
+    """Retorna o segredo de uma senha sob demanda (para cópia), sem despejar
+    todas as senhas no HTML da listagem. Só quem tem acesso recebe o dado."""
+    try:
+        _resource, secret = PasswordService.get_or_deny(request.user, pk)
+    except PermissionDenied:
+        return JsonResponse({"error": "Sem permissão."}, status=403)
+    return JsonResponse({"data": secret.data if secret else ""})
 
 
 # ── Folders ───────────────────────────────────────────────────────────────
@@ -678,18 +693,42 @@ def user_delete(request, pk):
 
 @login_required
 def file_list(request):
-    accessible = FileSecret.objects.filter(user=request.user).values_list("file_resource_id", flat=True)
+    user = request.user
+    accessible = FileSecret.objects.filter(user=user).values_list("file_resource_id", flat=True)
     files = FileResource.objects.filter(
         pk__in=accessible, upload_completed=True,
         deleted_at__isnull=True, resource__deleted_at__isnull=True,
-    ).select_related("resource", "created_by").order_by("-created_at")
+    ).select_related("resource", "created_by")
     category = request.GET.get("category", "")
+    q = request.GET.get("q", "")
     if category:
         files = files.filter(mime_category=category)
-    q = request.GET.get("q", "")
     if q:
         files = files.filter(resource__name__icontains=q)
-    return render(request, "files/list.html", {"files": files, "current_category": category})
+
+    current_folder = None
+    folders = Folder.objects.none()
+    if q or category:
+        # Busca/filtro por categoria: resultado plano, ignorando a navegação por pastas.
+        files = files.order_by("-created_at")
+    else:
+        folder_id = request.GET.get("folder")
+        if folder_id:
+            current_folder = get_object_or_404(Folder, pk=folder_id, deleted_at__isnull=True)
+            if not _can_view_folder(user, current_folder):
+                messages.error(request, "Sem permissão.")
+                return redirect("file_list")
+            files = files.filter(resource__folder=current_folder)
+            folders = _user_folders(user, parent=current_folder)
+        else:
+            files = files.filter(resource__folder__isnull=True)
+            folders = _user_folders(user, parent__isnull=True)
+        files = files.order_by("-created_at")
+
+    return render(request, "files/list.html", {
+        "files": files, "current_category": category,
+        "folders": folders, "current_folder": current_folder,
+    })
 
 
 @login_required
@@ -706,7 +745,9 @@ def file_upload(request):
             messages.error(request, str(e.message if hasattr(e, "message") else e))
             return redirect("file_upload")
     folders = _user_folders(request.user)
-    return render(request, "files/upload.html", {"folders": folders})
+    return render(request, "files/upload.html", {
+        "folders": folders, "selected_folder": request.GET.get("folder", ""),
+    })
 
 
 @login_required
@@ -731,7 +772,9 @@ def file_create_text(request):
             messages.error(request, str(e.message if hasattr(e, "message") else e))
             return redirect("file_create_text")
     folders = _user_folders(request.user)
-    return render(request, "files/create_text.html", {"folders": folders})
+    return render(request, "files/create_text.html", {
+        "folders": folders, "selected_folder": request.GET.get("folder", ""),
+    })
 
 
 _PREVIEW_EXTS = {
@@ -864,6 +907,52 @@ def file_unshare(request, pk):
 
 # ── Audit ─────────────────────────────────────────────────────────────────
 
+# Mapeia rotas com <pk> ao (app, modelo) do recurso, para mostrar o nome
+# em vez de "pk=<uuid>" nos detalhes da auditoria.
+_AUDIT_ROUTE_MODEL = {
+    "password_detail": ("resources", "Resource"),
+    "password_edit": ("resources", "Resource"),
+    "password_delete": ("resources", "Resource"),
+    "password_share": ("resources", "Resource"),
+    "password_unshare_group": ("resources", "Resource"),
+    "folder_detail": ("folders", "Folder"),
+    "folder_delete": ("folders", "Folder"),
+    "folder_share": ("folders", "Folder"),
+    "group_detail": ("groups", "Group"),
+    "group_edit": ("groups", "Group"),
+    "group_delete": ("groups", "Group"),
+    "user_detail": ("accounts", "User"),
+    "user_delete": ("accounts", "User"),
+    "file_detail": ("files", "FileResource"),
+    "file_download": ("files", "FileResource"),
+    "file_delete": ("files", "FileResource"),
+    "file_share": ("files", "FileResource"),
+}
+
+
+def _audit_detail_text(log):
+    from django.apps import apps as django_apps
+
+    params = (log.context or {}).get("params") or {}
+    pk = params.get("pk")
+    mapping = _AUDIT_ROUTE_MODEL.get(log.action)
+    if mapping and pk:
+        app_label, model_name = mapping
+        model = django_apps.get_model(app_label, model_name)
+        obj = model.objects.filter(pk=pk).first()
+        if obj is not None:
+            if model_name == "FileResource":
+                return obj.resource.name
+            if model_name == "User":
+                return obj.get_full_name() or obj.email
+            return getattr(obj, "name", str(obj))
+    if (log.context or {}).get("email"):
+        return log.context["email"]
+    if params:
+        return " ".join(f"{k}={v}" for k, v in params.items())
+    return ""
+
+
 @login_required
 @user_passes_test(is_staff)
 def audit_logs(request):
@@ -881,6 +970,7 @@ def audit_logs(request):
     log_list = list(logs[:200])
     for log in log_list:
         log.action_label = ROUTE_LABELS.get(log.action, log.action)
+        log.detail_text = _audit_detail_text(log)
     action_choices = ActionLog.objects.values_list("action", flat=True).distinct().order_by("action")
     return render(request, "audit/list.html", {
         "logs": log_list,

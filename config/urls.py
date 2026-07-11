@@ -47,6 +47,7 @@ from apps.core.views_web import (
     password_detail,
     password_edit,
     password_list,
+    password_secret,
     password_share,
     password_unshare_group,
     profile,
@@ -74,6 +75,7 @@ urlpatterns = [
     path("passwords/<uuid:pk>/delete/", password_delete, name="password_delete"),
     path("passwords/<uuid:pk>/share/", password_share, name="password_share"),
     path("passwords/<uuid:pk>/unshare-group/", password_unshare_group, name="password_unshare_group"),
+    path("passwords/<uuid:pk>/secret/", password_secret, name="password_secret"),
 
     # ── Folders ───────────────────────────────────────────────────────────
     path("folders/", folder_list, name="folder_list"),

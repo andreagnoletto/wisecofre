@@ -68,8 +68,11 @@
                         <td>
                             {% if log.user %}
                             <span class="fw-medium">{{ log.user.get_full_name|default:log.user.email }}</span>
+                            {% elif log.context.email %}
+                            <span class="fw-medium">{{ log.context.email }}</span>
+                            <span class="badge bg-secondary-subtle text-secondary ms-1">anônimo</span>
                             {% else %}
-                            <span class="text-muted">—</span>
+                            <span class="text-muted" title="Ação sem usuário autenticado">Anônimo</span>
                             {% endif %}
                         </td>
                         <td>{{ log.action_label }}</td>
@@ -81,13 +84,7 @@
                             {% endif %}
                         </td>
                         <td class="text-muted small">{{ log.ip_address|default:"—" }}</td>
-                        <td class="small text-muted">
-                            {% if log.context and log.context.params %}
-                            {% for k, v in log.context.params.items %}{{ k }}={{ v }} {% endfor %}
-                            {% else %}
-                            —
-                            {% endif %}
-                        </td>
+                        <td class="small text-muted">{{ log.detail_text|default:"—" }}</td>
                     </tr>
                     {% empty %}
                     <tr>

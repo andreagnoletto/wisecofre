@@ -99,3 +99,32 @@ const WiseAPI = {
 function notify(message, type = 'info') {
     window.dispatchEvent(new CustomEvent('notify', { detail: { message, type } }));
 }
+
+/**
+ * Copia texto para a área de transferência com feedback.
+ */
+async function copyToClipboard(text, message) {
+    try {
+        await navigator.clipboard.writeText(text || '');
+        notify(message || 'Copiado', 'success');
+    } catch (e) {
+        notify('Não foi possível copiar.', 'error');
+    }
+}
+
+/**
+ * Busca o segredo de uma senha sob demanda e copia (não fica no HTML da lista).
+ */
+async function copyPasswordSecret(url) {
+    try {
+        const resp = await fetch(url, { credentials: 'same-origin' });
+        if (!resp.ok) {
+            notify('Sem permissão para copiar esta senha.', 'error');
+            return;
+        }
+        const data = await resp.json();
+        await copyToClipboard(data.data || '', 'Senha copiada!');
+    } catch (e) {
+        notify('Erro ao copiar a senha.', 'error');
+    }
+}

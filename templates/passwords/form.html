@@ -46,7 +46,7 @@
                             <select name="folder" id="id_folder" class="form-select">
                                 <option value="">— Nenhuma —</option>
                                 {% for folder in folders %}
-                                <option value="{{ folder.pk }}" {% if resource.folder_id|stringformat:"s" == folder.pk|stringformat:"s" %}selected{% endif %}>
+                                <option value="{{ folder.pk }}" {% if resource.folder_id|stringformat:"s" == folder.pk|stringformat:"s" or selected_folder == folder.pk|stringformat:"s" %}selected{% endif %}>
                                     {{ folder.name }}
                                 </option>
                                 {% endfor %}
