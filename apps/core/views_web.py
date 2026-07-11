@@ -515,6 +515,44 @@ def group_list(request):
     return render(request, "groups/list.html", {"groups": groups})
 
 
+def _group_shared_resources(group):
+    """Recursos (senhas, arquivos e pastas) compartilhados diretamente com o grupo,
+    a partir das permissões aro='Group'. Arquivos dentro de pastas compartilhadas
+    aparecem via suas próprias permissões de arquivo; senhas idem."""
+    from django.urls import reverse
+
+    from apps.sharing.models import Permission
+
+    perms = Permission.objects.filter(aro="Group", aro_foreign_key=group.pk)
+    resource_ids, file_ids, folder_ids = [], [], []
+    for p in perms:
+        if p.aco == "Resource":
+            resource_ids.append(p.aco_foreign_key)
+        elif p.aco == "FileResource":
+            file_ids.append(p.aco_foreign_key)
+        elif p.aco == "Folder":
+            folder_ids.append(p.aco_foreign_key)
+
+    items = []
+    for f in Folder.objects.filter(pk__in=folder_ids, deleted_at__isnull=True):
+        items.append({"name": f.name, "resource_type": "folder",
+                      "url": reverse("folder_detail", args=[f.pk])})
+    for fr in FileResource.objects.filter(
+        pk__in=file_ids, deleted_at__isnull=True
+    ).select_related("resource"):
+        items.append({"name": fr.resource.name, "resource_type": "file",
+                      "url": reverse("file_detail", args=[fr.pk])})
+    for r in Resource.objects.filter(
+        pk__in=resource_ids, deleted_at__isnull=True
+    ).select_related("resource_type"):
+        # arquivos já foram listados via FileResource; aqui apenas senhas
+        if r.resource_type.slug == "file":
+            continue
+        items.append({"name": r.name, "resource_type": "password",
+                      "url": reverse("password_detail", args=[r.pk])})
+    return items
+
+
 @login_required
 def group_detail(request, pk):
     try:
@@ -524,7 +562,8 @@ def group_detail(request, pk):
         return redirect("group_list")
     return render(request, "groups/detail.html", {
         "group": group, "members": members,
-        "available_users": available_users, "shared_resources": [],
+        "available_users": available_users,
+        "shared_resources": _group_shared_resources(group),
         "is_group_admin": is_admin,
     })
 

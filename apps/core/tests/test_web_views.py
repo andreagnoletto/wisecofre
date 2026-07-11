@@ -6,6 +6,7 @@ from apps.accounts.models import User
 from apps.audit.models import ActionLog
 from apps.files.models import FileResource, FileSecret
 from apps.folders.models import Folder
+from apps.groups.models import Group, GroupUser
 from apps.resources.models import Resource, ResourceType, Secret
 
 
@@ -155,3 +156,45 @@ def test_audit_detail_shows_resource_name(db):
     assert resp.status_code == 200
     # o nome do recurso aparece nos detalhes, em vez de "pk=<uuid>"
     assert resource.name in resp.content.decode()
+
+
+# ── group detail lists shared resources ─────────────────────────────────────
+
+def _make_group(owner):
+    g = Group.objects.create(name="Equipe", created_by=owner)
+    GroupUser.objects.create(group=g, user=owner, is_admin=True)
+    return g
+
+
+def test_group_detail_lists_shared_password(owner):
+    group = _make_group(owner)
+    resource = make_password(owner)
+    client = Client()
+    client.force_login(owner)
+    client.post(
+        reverse("password_share", args=[resource.pk]),
+        {"share_type": "group", "group_id": str(group.pk), "permission": "read"},
+    )
+
+    resp = client.get(reverse("group_detail", args=[group.pk]))
+
+    assert resp.status_code == 200
+    assert len(resp.context["shared_resources"]) == 1
+    assert resource.name in resp.content.decode()
+
+
+def test_group_detail_lists_shared_folder(owner):
+    group = _make_group(owner)
+    folder = Folder.objects.create(name="Cofre RH", created_by=owner)
+    client = Client()
+    client.force_login(owner)
+    client.post(
+        reverse("folder_share", args=[folder.pk]),
+        {"group_id": str(group.pk), "permission": "read"},
+    )
+
+    resp = client.get(reverse("group_detail", args=[group.pk]))
+
+    types = {r["resource_type"] for r in resp.context["shared_resources"]}
+    assert "folder" in types
+    assert "Cofre RH" in resp.content.decode()

@@ -125,11 +125,18 @@
                 <i class="bi bi-key text-primary"></i>
                 {% elif res.resource_type == 'file' %}
                 <i class="bi bi-file-earmark-lock text-success"></i>
+                {% elif res.resource_type == 'folder' %}
+                <i class="bi bi-folder-fill text-warning"></i>
                 {% else %}
                 <i class="bi bi-box text-secondary"></i>
                 {% endif %}
-                <span>{{ res.name }}</span>
-                <span class="badge bg-light text-dark ms-auto">{{ res.resource_type }}</span>
+                <a href="{{ res.url }}" class="text-decoration-none">{{ res.name }}</a>
+                <span class="badge bg-light text-dark ms-auto">
+                    {% if res.resource_type == 'password' %}Senha
+                    {% elif res.resource_type == 'file' %}Arquivo
+                    {% elif res.resource_type == 'folder' %}Pasta
+                    {% else %}{{ res.resource_type }}{% endif %}
+                </span>
             </li>
             {% endfor %}
         </ul>
