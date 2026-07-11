@@ -182,6 +182,16 @@
 <script src="https://unpkg.com/openpgp@5.11.2/dist/openpgp.min.js"></script>
 <script src="{% static 'js/wisecofre.js' %}"></script>
 <script src="{% static 'js/crypto.js' %}"></script>
+<script>
+    // Dropdowns dentro de tabelas responsivas (.table-responsive tem overflow:auto,
+    // que recorta o menu ao abrir na última linha). A estratégia 'fixed' do Popper
+    // posiciona o menu com position:fixed, escapando do recorte de overflow.
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.table-responsive [data-bs-toggle="dropdown"]').forEach(function (el) {
+            bootstrap.Dropdown.getOrCreateInstance(el, { popperConfig: { strategy: 'fixed' } });
+        });
+    });
+</script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>
