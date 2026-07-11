@@ -197,6 +197,25 @@ def password_create(request):
     return render(request, "passwords/form.html", {"form_title": "Nova Senha", "folders": folders})
 
 
+def _group_access_list(permissions):
+    """Mapeia as permissões de grupo (aro='Group') de um recurso para os grupos,
+    com rótulo de permissão, para exibição na tela de detalhe."""
+    from apps.sharing.models import Permission
+    group_perms = permissions.filter(aro="Group")
+    group_ids = list(group_perms.values_list("aro_foreign_key", flat=True))
+    if not group_ids:
+        return []
+    groups = {g.pk: g for g in Group.objects.filter(pk__in=group_ids)}
+    result = []
+    for gp in group_perms:
+        group = groups.get(gp.aro_foreign_key)
+        if not group:
+            continue
+        label = "Leitura" if gp.type == Permission.READ else "Leitura/Escrita"
+        result.append({"group": group, "permission": label})
+    return result
+
+
 @login_required
 def password_detail(request, pk):
     try:
@@ -210,13 +229,17 @@ def password_detail(request, pk):
     access_list = [{"user": resource.created_by, "permission": "Proprietário"}]
     for u in shared_users:
         if u != resource.created_by:
-            perm = permissions.filter(aro_foreign_key=u.pk).first()
+            perm = permissions.filter(aro="User", aro_foreign_key=u.pk).first()
             perm_label = "Leitura" if perm and perm.type == Permission.READ else "Leitura/Escrita"
             access_list.append({"user": u, "permission": perm_label})
+    group_access = _group_access_list(permissions)
     history = resource.secrets.all().order_by("-created_at")
+    can_manage = resource.created_by == request.user or request.user.is_staff
     return render(request, "passwords/detail.html", {
         "resource": resource, "secret": secret,
-        "access_list": access_list, "secret_versions": history,
+        "access_list": access_list, "group_access": group_access,
+        "shareable_groups": GroupService.list_for_user(request.user),
+        "can_manage": can_manage, "secret_versions": history,
     })
 
 
@@ -264,13 +287,23 @@ def password_delete(request, pk):
 @login_required
 @require_POST
 def password_share(request, pk):
+    share_type = request.POST.get("share_type", "user")
+    permission = request.POST.get("permission", "read")
     try:
-        target = PasswordService.share(
-            request.user, pk,
-            target_email=request.POST.get("user_email", "").strip(),
-            permission_type=request.POST.get("permission", "read"),
-        )
-        messages.success(request, f"Senha compartilhada com {target.get_full_name() or target.email}.")
+        if share_type == "group":
+            group = PasswordService.share_with_group(
+                request.user, pk,
+                group_id=request.POST.get("group_id", ""),
+                permission_type=permission,
+            )
+            messages.success(request, f"Senha compartilhada com o grupo {group.name}.")
+        else:
+            target = PasswordService.share(
+                request.user, pk,
+                target_email=request.POST.get("user_email", "").strip(),
+                permission_type=permission,
+            )
+            messages.success(request, f"Senha compartilhada com {target.get_full_name() or target.email}.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     except ValidationError as e:
@@ -278,12 +311,44 @@ def password_share(request, pk):
     return redirect("password_detail", pk=pk)
 
 
+@login_required
+@require_POST
+def password_unshare_group(request, pk):
+    try:
+        PasswordService.unshare_group(request.user, pk, request.POST.get("group_id"))
+        messages.success(request, "Acesso do grupo revogado.")
+    except PermissionDenied:
+        messages.error(request, "Sem permissão.")
+    return redirect("password_detail", pk=pk)
+
+
 # ── Folders ───────────────────────────────────────────────────────────────
+
+def _folder_ids_shared_with_user(user):
+    """Ids de pastas compartilhadas com algum grupo do qual o usuário é membro."""
+    from apps.sharing.models import Permission
+    group_ids = GroupUser.objects.filter(user=user).values_list("group_id", flat=True)
+    if not group_ids:
+        return set()
+    return set(
+        Permission.objects.filter(
+            aco="Folder", aro="Group", aro_foreign_key__in=list(group_ids),
+        ).values_list("aco_foreign_key", flat=True)
+    )
+
+
+def _can_view_folder(user, folder):
+    if user.is_staff or folder.created_by == user:
+        return True
+    return folder.pk in _folder_ids_shared_with_user(user)
+
 
 def _user_folders(user, **extra_filters):
     qs = Folder.objects.filter(deleted_at__isnull=True, **extra_filters)
     if not user.is_staff:
-        qs = qs.filter(created_by=user)
+        from django.db.models import Q
+        shared_ids = _folder_ids_shared_with_user(user)
+        qs = qs.filter(Q(created_by=user) | Q(pk__in=shared_ids))
     return qs
 
 
@@ -314,7 +379,7 @@ def folder_list(request):
 @login_required
 def folder_detail(request, pk):
     folder = get_object_or_404(Folder, pk=pk, deleted_at__isnull=True)
-    if not request.user.is_staff and folder.created_by != request.user:
+    if not _can_view_folder(request.user, folder):
         messages.error(request, "Sem permissão.")
         return redirect("folder_list")
     ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
@@ -356,11 +421,45 @@ def folder_detail(request, pk):
 
     children = _user_folders(user, parent=folder)
     all_folders = _user_folders(user)
+    from apps.sharing.models import Permission
+    permissions = Permission.objects.filter(aco="Folder", aco_foreign_key=folder.pk)
+    can_manage = folder.created_by == user or user.is_staff
     return render(request, "folders/list.html", {
         "folders": children, "current_folder": folder,
         "passwords": passwords, "file_resources": file_resources,
         "all_folders": all_folders,
+        "group_access": _group_access_list(permissions),
+        "shareable_groups": GroupService.list_for_user(user),
+        "can_manage": can_manage,
     })
+
+
+@login_required
+@require_POST
+def folder_share(request, pk):
+    try:
+        group = FolderService.share_with_group(
+            request.user, pk,
+            group_id=request.POST.get("group_id", ""),
+            permission_type=request.POST.get("permission", "read"),
+        )
+        messages.success(request, f"Pasta compartilhada com o grupo {group.name}.")
+    except PermissionDenied:
+        messages.error(request, "Sem permissão.")
+    except ValidationError as e:
+        messages.error(request, str(e.message if hasattr(e, "message") else e))
+    return redirect("folder_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def folder_unshare_group(request, pk):
+    try:
+        FolderService.unshare_group(request.user, pk, request.POST.get("group_id"))
+        messages.success(request, "Acesso do grupo revogado.")
+    except PermissionDenied:
+        messages.error(request, "Sem permissão.")
+    return redirect("folder_detail", pk=pk)
 
 
 @login_required
@@ -656,9 +755,15 @@ def file_detail(request, pk):
         return HttpResponseForbidden("Sem permissão.")
     access_logs = FileAccessLog.objects.filter(file_resource=file).select_related("user").order_by("-created_at")[:20]
     shared_secrets = FileSecret.objects.filter(file_resource=file).select_related("user")
+    from apps.sharing.models import Permission
+    permissions = Permission.objects.filter(aco="FileResource", aco_foreign_key=file.pk)
+    can_manage = file.created_by == request.user or request.user.is_staff
     return render(request, "files/detail.html", {
         "file": file, "secret": secret,
         "access_logs": access_logs, "shared_users": shared_secrets,
+        "group_access": _group_access_list(permissions),
+        "shareable_groups": GroupService.list_for_user(request.user),
+        "can_manage": can_manage,
         "is_previewable": _is_previewable(file),
     })
 
@@ -716,13 +821,33 @@ def file_delete(request, pk):
 @login_required
 @require_POST
 def file_share(request, pk):
+    share_type = request.POST.get("share_type", "user")
     try:
-        target = FileService.share(request.user, pk, request.POST.get("user_query", "").strip())
-        messages.success(request, f"Arquivo compartilhado com {target.get_full_name() or target.email}.")
+        if share_type == "group":
+            group = FileService.share_with_group(
+                request.user, pk,
+                group_id=request.POST.get("group_id", ""),
+                permission_type=request.POST.get("permission", "read"),
+            )
+            messages.success(request, f"Arquivo compartilhado com o grupo {group.name}.")
+        else:
+            target = FileService.share(request.user, pk, request.POST.get("user_query", "").strip())
+            messages.success(request, f"Arquivo compartilhado com {target.get_full_name() or target.email}.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     except ValidationError as e:
         messages.error(request, str(e.message if hasattr(e, "message") else e))
+    return redirect("file_detail", pk=pk)
+
+
+@login_required
+@require_POST
+def file_unshare_group(request, pk):
+    try:
+        FileService.unshare_group(request.user, pk, request.POST.get("group_id"))
+        messages.success(request, "Acesso do grupo revogado.")
+    except PermissionDenied:
+        messages.error(request, "Sem permissão.")
     return redirect("file_detail", pk=pk)
 
 

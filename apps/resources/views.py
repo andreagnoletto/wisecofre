@@ -39,11 +39,13 @@ class ResourceViewSet(ModelViewSet):
 
     def _shared_resource_ids(self):
         from apps.sharing.models import Permission
+        from apps.sharing.services import SharingService
 
-        return Permission.objects.filter(
-            aco="Resource",
-            aro="User",
-            aro_foreign_key=self.request.user.pk,
+        user = self.request.user
+        group_ids = list(SharingService.group_ids_for_user(user))
+        return Permission.objects.filter(aco="Resource").filter(
+            models.Q(aro="User", aro_foreign_key=user.pk)
+            | models.Q(aro="Group", aro_foreign_key__in=group_ids)
         ).values_list("aco_foreign_key", flat=True)
 
     def get_serializer_class(self):

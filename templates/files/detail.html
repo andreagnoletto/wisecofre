@@ -182,30 +182,74 @@
     <!-- Right column -->
     <div class="col-lg-4" id="share">
         <!-- Share card -->
-        <div class="card border-0 shadow-sm mb-4" x-data="{ query: '', permission: 'read' }">
+        <div class="card border-0 shadow-sm mb-4" x-data="{ shareType: 'user', query: '', groupId: '', permission: 'read' }">
             <div class="card-header bg-transparent">
                 <h6 class="mb-0"><i class="bi bi-share me-2"></i>Compartilhar</h6>
             </div>
             <div class="card-body">
                 <form method="post" action="{% url 'file_share' file.pk %}">
                     {% csrf_token %}
-                    <div class="mb-3">
+                    <input type="hidden" name="share_type" :value="shareType">
+                    <div class="btn-group w-100 mb-3" role="group">
+                        <input type="radio" class="btn-check" id="fst-user" value="user" x-model="shareType">
+                        <label class="btn btn-outline-primary btn-sm" for="fst-user"><i class="bi bi-person me-1"></i>Usuário</label>
+                        <input type="radio" class="btn-check" id="fst-group" value="group" x-model="shareType">
+                        <label class="btn btn-outline-primary btn-sm" for="fst-group"><i class="bi bi-people me-1"></i>Grupo</label>
+                    </div>
+                    <div class="mb-3" x-show="shareType === 'user'">
                         <input type="text" name="user_query" class="form-control form-control-sm"
                                placeholder="Buscar usuário por nome ou email..." x-model="query">
+                    </div>
+                    <div class="mb-3" x-show="shareType === 'group'">
+                        <select name="group_id" class="form-select form-select-sm" x-model="groupId">
+                            <option value="">Selecione um grupo…</option>
+                            {% for g in shareable_groups %}
+                            <option value="{{ g.pk }}">{{ g.name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="mb-3">
                         <select name="permission" class="form-select form-select-sm" x-model="permission">
                             <option value="read">Leitura</option>
                             <option value="write">Edição</option>
-                            <option value="owner">Proprietário</option>
                         </select>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-sm w-100" :disabled="!query.trim()">
+                    <button type="submit" class="btn btn-primary btn-sm w-100"
+                            :disabled="(shareType === 'user' && !query.trim()) || (shareType === 'group' && !groupId)">
                         <i class="bi bi-person-plus me-1"></i>Compartilhar
                     </button>
                 </form>
             </div>
         </div>
+
+        {% if group_access %}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-transparent">
+                <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>Grupos com acesso</h6>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for ga in group_access %}
+                <li class="list-group-item d-flex align-items-center gap-3">
+                    <span class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                          style="width:36px;height:36px;font-size:14px;"><i class="bi bi-people"></i></span>
+                    <div class="flex-grow-1 min-width-0">
+                        <div class="fw-medium small text-truncate">{{ ga.group.name }}</div>
+                        <span class="badge bg-secondary small">{{ ga.permission }}</span>
+                    </div>
+                    {% if can_manage %}
+                    <form method="post" action="{% url 'file_unshare_group' file.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="group_id" value="{{ ga.group.pk }}">
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Revogar acesso do grupo">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
 
         <!-- Users with access -->
         <div class="card border-0 shadow-sm">

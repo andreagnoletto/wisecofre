@@ -15,6 +15,7 @@ from apps.folders.models import Folder
 from apps.groups.models import Group, GroupUser
 from apps.resources.models import Resource, ResourceType, Secret, Tag
 from apps.sharing.models import Permission
+from apps.sharing.services import SharingService
 
 
 # ── Passwords ─────────────────────────────────────────────────────────────
@@ -50,6 +51,8 @@ class PasswordService:
                         defaults={"label": label},
                     )
                     resource.tags.add(tag)
+        if folder_id:
+            SharingService.reconcile_folder(folder_id)
         return resource
 
     @staticmethod
@@ -113,6 +116,26 @@ class PasswordService:
         )
         return target
 
+    @staticmethod
+    def share_with_group(user, pk, group_id, permission_type="read"):
+        resource = get_object_or_404(Resource, pk=pk)
+        can_share = Secret.objects.filter(resource=resource, user=user).exists()
+        if not can_share and not user.is_staff:
+            raise PermissionDenied("Sem permissão para compartilhar.")
+        group = get_object_or_404(Group, pk=group_id, deleted_at__isnull=True)
+        perm_map = {"read": Permission.READ, "write": Permission.UPDATE}
+        SharingService.share_password_with_group(
+            resource, group, perm_map.get(permission_type, Permission.READ), user
+        )
+        return group
+
+    @staticmethod
+    def unshare_group(user, pk, group_id):
+        resource = get_object_or_404(Resource, pk=pk)
+        if resource.created_by != user and not user.is_staff:
+            raise PermissionDenied("Apenas o proprietário pode revogar acesso.")
+        SharingService.unshare_group("Resource", resource.pk, group_id)
+
 
 # ── Folders ───────────────────────────────────────────────────────────────
 
@@ -132,6 +155,25 @@ class FolderService:
         if folder.created_by != user and not user.is_staff:
             raise PermissionDenied("Apenas o proprietário pode excluir esta pasta.")
         folder.hard_delete()
+
+    @staticmethod
+    def share_with_group(user, pk, group_id, permission_type="read"):
+        folder = get_object_or_404(Folder, pk=pk, deleted_at__isnull=True)
+        if folder.created_by != user and not user.is_staff:
+            raise PermissionDenied("Apenas o proprietário pode compartilhar esta pasta.")
+        group = get_object_or_404(Group, pk=group_id, deleted_at__isnull=True)
+        perm_map = {"read": Permission.READ, "write": Permission.UPDATE}
+        SharingService.share_folder_with_group(
+            folder, group, perm_map.get(permission_type, Permission.READ), user
+        )
+        return group
+
+    @staticmethod
+    def unshare_group(user, pk, group_id):
+        folder = get_object_or_404(Folder, pk=pk)
+        if folder.created_by != user and not user.is_staff:
+            raise PermissionDenied("Apenas o proprietário pode revogar acesso.")
+        SharingService.unshare_group("Folder", folder.pk, group_id)
 
 
 # ── Groups ────────────────────────────────────────────────────────────────
@@ -203,6 +245,7 @@ class GroupService:
         else:
             raise ValidationError("Informe o usuário.")
         GroupUser.objects.get_or_create(group=group, user=target)
+        SharingService.on_group_membership_changed(group)
         return target
 
     @staticmethod
@@ -210,6 +253,7 @@ class GroupService:
         group = get_object_or_404(Group, pk=group_pk)
         GroupService._require_admin(user, group)
         GroupUser.objects.filter(group=group, user_id=target_user_pk).delete()
+        SharingService.on_group_membership_changed(group)
 
     @staticmethod
     def toggle_admin(user, group_pk, target_user_pk):
@@ -274,6 +318,8 @@ class FileService:
         FileSecret.objects.create(
             file_resource=fr, user=user, session_key_encrypted="local-storage",
         )
+        if folder_id:
+            SharingService.reconcile_folder(folder_id)
         return fr
 
     @staticmethod
@@ -300,6 +346,8 @@ class FileService:
         FileSecret.objects.create(
             file_resource=fr, user=user, session_key_encrypted="local-storage",
         )
+        if folder_id:
+            SharingService.reconcile_folder(folder_id)
         return fr
 
     @staticmethod
@@ -347,11 +395,40 @@ class FileService:
             file_resource=fr, user=target,
             defaults={"session_key_encrypted": "shared"},
         )
+        Permission.objects.update_or_create(
+            aco="FileResource", aco_foreign_key=fr.pk,
+            aro="User", aro_foreign_key=target.pk,
+            defaults={"type": Permission.READ, "created_by": user},
+        )
         return target
+
+    @staticmethod
+    def share_with_group(user, pk, group_id, permission_type="read"):
+        fr = get_object_or_404(FileResource, pk=pk)
+        can_share = FileSecret.objects.filter(file_resource=fr, user=user).exists()
+        if not can_share and not user.is_staff:
+            raise PermissionDenied("Sem permissão para compartilhar.")
+        group = get_object_or_404(Group, pk=group_id, deleted_at__isnull=True)
+        perm_map = {"read": Permission.READ, "write": Permission.UPDATE}
+        SharingService.share_file_with_group(
+            fr, group, perm_map.get(permission_type, Permission.READ), user
+        )
+        return group
 
     @staticmethod
     def unshare(user, pk, target_user_id):
         fr = get_object_or_404(FileResource, pk=pk)
         if fr.created_by != user and not user.is_staff:
             raise PermissionDenied("Apenas o proprietário pode revogar acesso.")
-        FileSecret.objects.filter(file_resource=fr, user_id=target_user_id).delete()
+        Permission.objects.filter(
+            aco="FileResource", aco_foreign_key=fr.pk,
+            aro="User", aro_foreign_key=target_user_id,
+        ).delete()
+        SharingService.reconcile_file_secrets(fr)
+
+    @staticmethod
+    def unshare_group(user, pk, group_id):
+        fr = get_object_or_404(FileResource, pk=pk)
+        if fr.created_by != user and not user.is_staff:
+            raise PermissionDenied("Apenas o proprietário pode revogar acesso.")
+        SharingService.unshare_group("FileResource", fr.pk, group_id)

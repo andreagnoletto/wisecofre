@@ -43,16 +43,18 @@ class ResourceFilter(filters.FilterSet):
     def filter_shared_with_me(self, queryset, name, value):
         if not value:
             return queryset
-        from apps.sharing.models import Permission
+        from django.db.models import Q
 
-        resource_ids = Permission.objects.filter(
-            aco="Resource",
-            aro="User",
-            aro_foreign_key=self.request.user.pk,
+        from apps.sharing.models import Permission
+        from apps.sharing.services import SharingService
+
+        user = self.request.user
+        group_ids = list(SharingService.group_ids_for_user(user))
+        resource_ids = Permission.objects.filter(aco="Resource").filter(
+            Q(aro="User", aro_foreign_key=user.pk)
+            | Q(aro="Group", aro_foreign_key__in=group_ids)
         ).values_list("aco_foreign_key", flat=True)
-        return queryset.filter(id__in=resource_ids).exclude(
-            created_by=self.request.user
-        )
+        return queryset.filter(id__in=resource_ids).exclude(created_by=user)
 
     def filter_owned_by_me(self, queryset, name, value):
         if value:

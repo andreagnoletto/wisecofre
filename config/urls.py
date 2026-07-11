@@ -20,11 +20,14 @@ from apps.core.views_web import (
     file_list,
     file_share,
     file_unshare,
+    file_unshare_group,
     file_upload,
     file_create_text,
     folder_delete,
     folder_detail,
     folder_list,
+    folder_share,
+    folder_unshare_group,
     gpg_key_delete,
     gpg_key_upload,
     group_add_member,
@@ -45,6 +48,7 @@ from apps.core.views_web import (
     password_edit,
     password_list,
     password_share,
+    password_unshare_group,
     profile,
     profile_change_password,
     user_delete,
@@ -69,11 +73,14 @@ urlpatterns = [
     path("passwords/<uuid:pk>/edit/", password_edit, name="password_edit"),
     path("passwords/<uuid:pk>/delete/", password_delete, name="password_delete"),
     path("passwords/<uuid:pk>/share/", password_share, name="password_share"),
+    path("passwords/<uuid:pk>/unshare-group/", password_unshare_group, name="password_unshare_group"),
 
     # ── Folders ───────────────────────────────────────────────────────────
     path("folders/", folder_list, name="folder_list"),
     path("folders/<uuid:pk>/", folder_detail, name="folder_detail"),
     path("folders/<uuid:pk>/delete/", folder_delete, name="folder_delete"),
+    path("folders/<uuid:pk>/share/", folder_share, name="folder_share"),
+    path("folders/<uuid:pk>/unshare-group/", folder_unshare_group, name="folder_unshare_group"),
 
     # ── Groups ────────────────────────────────────────────────────────────
     path("groups/", group_list, name="group_list"),
@@ -101,6 +108,7 @@ urlpatterns = [
     path("files/<uuid:pk>/delete/", file_delete, name="file_delete"),
     path("files/<uuid:pk>/share/", file_share, name="file_share"),
     path("files/<uuid:pk>/unshare/", file_unshare, name="file_unshare"),
+    path("files/<uuid:pk>/unshare-group/", file_unshare_group, name="file_unshare_group"),
 
     # ── Audit ─────────────────────────────────────────────────────────────
     path("audit/", audit_logs, name="audit_logs"),

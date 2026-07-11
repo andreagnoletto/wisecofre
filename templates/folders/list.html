@@ -27,10 +27,41 @@
             <p class="text-muted mb-0">Organize seus recursos em pastas e sub-pastas.</p>
             {% endif %}
         </div>
-        <button class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createFolderModal">
-            <i class="bi bi-plus-lg"></i> Nova Pasta
-        </button>
+        <div class="d-flex gap-2">
+            {% if current_folder and can_manage %}
+            <button class="btn btn-outline-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#shareFolderModal">
+                <i class="bi bi-share"></i> Compartilhar
+            </button>
+            {% endif %}
+            <button class="btn btn-primary d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createFolderModal">
+                <i class="bi bi-plus-lg"></i> Nova Pasta
+            </button>
+        </div>
     </div>
+
+    {% if current_folder and group_access %}
+    <h6 class="text-muted mb-2"><i class="bi bi-people-fill me-1"></i> Grupos com acesso a esta pasta</h6>
+    <div class="card shadow-sm mb-3">
+        <ul class="list-group list-group-flush">
+            {% for ga in group_access %}
+            <li class="list-group-item d-flex align-items-center gap-3 py-2">
+                <i class="bi bi-people text-success"></i>
+                <span class="fw-medium">{{ ga.group.name }}</span>
+                <span class="badge bg-secondary ms-2">{{ ga.permission }}</span>
+                {% if can_manage %}
+                <form method="post" action="{% url 'folder_unshare_group' current_folder.pk %}" class="ms-auto">
+                    {% csrf_token %}
+                    <input type="hidden" name="group_id" value="{{ ga.group.pk }}">
+                    <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Revogar acesso do grupo">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     {% if folders %}
     <!-- Folder tree / subfolders -->
@@ -89,6 +120,47 @@
                 </a>
                 {% endfor %}
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if current_folder and can_manage %}
+    <!-- Share Folder Modal -->
+    <div class="modal fade" id="shareFolderModal" tabindex="-1">
+        <div class="modal-dialog">
+            <form method="post" action="{% url 'folder_share' current_folder.pk %}" class="modal-content">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Compartilhar pasta "{{ current_folder.name }}"</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        Os membros do grupo terão acesso a esta pasta e a todos os recursos (senhas e arquivos) contidos nela.
+                    </p>
+                    <div class="mb-3">
+                        <label for="folder-share-group" class="form-label fw-semibold">Grupo</label>
+                        <select name="group_id" id="folder-share-group" class="form-select" required>
+                            {% for g in shareable_groups %}
+                            <option value="{{ g.pk }}">{{ g.name }}</option>
+                            {% empty %}
+                            <option value="" disabled>Você não participa de nenhum grupo</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="folder-share-perm" class="form-label fw-semibold">Permissão</label>
+                        <select name="permission" id="folder-share-perm" class="form-select">
+                            <option value="read">Leitura</option>
+                            <option value="write">Leitura e escrita</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-share me-1"></i> Compartilhar</button>
+                </div>
+            </form>
         </div>
     </div>
     {% endif %}
