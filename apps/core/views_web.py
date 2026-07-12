@@ -122,6 +122,69 @@ def logout_view(request):
     return redirect("login")
 
 
+def _client_ip(request):
+    """IP real do cliente. Atrás de proxy reverso (Coolify/Traefik) o REMOTE_ADDR
+    é o IP interno do proxy; o IP de origem vem em X-Forwarded-For (mais à esquerda)."""
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "")
+
+
+def password_reset_request(request):
+    """Solicitação de redefinição de senha (self-service). Envia o link via SMTP
+    configurado nas Configurações (mesmo caminho do convite). A resposta é sempre
+    genérica para não revelar quais e-mails têm conta."""
+    if request.user.is_authenticated:
+        return redirect("dashboard")
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip()
+        user = User.objects.filter(
+            email__iexact=email, is_active=True, deleted_at__isnull=True,
+        ).first()
+        if user:
+            from django.contrib.auth.tokens import default_token_generator
+            from django.utils.encoding import force_bytes
+            from django.utils.http import urlsafe_base64_encode
+
+            app_name = get_config("APP_NAME", "Wisecofre")
+            base_url = request.build_absolute_uri("/").rstrip("/")
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            reset_url = f"{base_url}/reset/{uid}/{token}/"
+            name = user.get_full_name() or user.email
+            body = (
+                f"Olá {name},\n\n"
+                f"Recebemos um pedido para redefinir sua senha no {app_name}.\n\n"
+                f"Redefina acessando o link abaixo:\n{reset_url}\n\n"
+                f"Se você não solicitou, ignore este e-mail.\n\n"
+                f"— Equipe {app_name}"
+            )
+            body_html = (
+                f"<p>Olá <strong>{escape(name)}</strong>,</p>"
+                f"<p>Recebemos um pedido para redefinir sua senha no "
+                f"<strong>{escape(app_name)}</strong>.</p>"
+                f"<p>Clique no botão abaixo para definir uma nova senha:</p>"
+                f'<p><a href="{reset_url}" style="display:inline-block;padding:12px 24px;'
+                f'background:#0d6efd;color:#fff;text-decoration:none;border-radius:6px;">'
+                f"Redefinir Senha</a></p>"
+                f"<p><small>Ou copie este link: {reset_url}</small></p>"
+                f"<p>Se você não solicitou, ignore este e-mail.</p>"
+                f"<p>— Equipe {escape(app_name)}</p>"
+            )
+            try:
+                _send_smtp(email, f"{app_name} — Redefinição de senha", body, body_html)
+            except Exception as e:
+                import logging
+                logging.getLogger("wisecofre").warning("Password reset email failed: %s", e)
+        return redirect("password_reset_done")
+    return render(request, "auth/password_reset_request.html", {})
+
+
+def password_reset_done(request):
+    return render(request, "auth/password_reset_done.html", {})
+
+
 # ── Dashboard ─────────────────────────────────────────────────────────────
 
 @login_required
@@ -870,7 +933,7 @@ def file_preview(request, pk):
         return JsonResponse({"error": "Arquivo não é texto legível."}, status=400)
     FileAccessLog.objects.create(
         file_resource=fr, user=request.user, action="view",
-        ip_address=request.META.get("REMOTE_ADDR", ""),
+        ip_address=_client_ip(request) or "0.0.0.0",
     )
     return JsonResponse({"content": text, "filename": filename})
 

@@ -149,7 +149,7 @@
                     <tbody>
                         {% for log in access_logs %}
                         <tr>
-                            <td class="small">{{ log.timestamp|date:"d/m/Y H:i" }}</td>
+                            <td class="small">{{ log.created_at|date:"d/m/Y H:i" }}</td>
                             <td class="small">{{ log.user.get_full_name|default:log.user.email }}</td>
                             <td>
                                 {% if log.action == 'download' %}

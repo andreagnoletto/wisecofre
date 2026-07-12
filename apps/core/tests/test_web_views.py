@@ -4,7 +4,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 from apps.audit.models import ActionLog
-from apps.files.models import FileResource, FileSecret
+from apps.files.models import FileAccessLog, FileResource, FileSecret
 from apps.folders.models import Folder
 from apps.groups.models import Group, GroupUser
 from apps.resources.models import Resource, ResourceType, Secret
@@ -181,6 +181,36 @@ def test_group_detail_lists_shared_password(owner):
     assert resp.status_code == 200
     assert len(resp.context["shared_resources"]) == 1
     assert resource.name in resp.content.decode()
+
+
+def test_file_detail_shows_access_log_date(owner):
+    fr = make_file(owner)
+    FileAccessLog.objects.create(
+        file_resource=fr, user=owner, action="view", ip_address="203.0.113.9",
+    )
+    client = Client()
+    client.force_login(owner)
+
+    resp = client.get(reverse("file_detail", args=[fr.pk]))
+
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    # a data/hora do log deve renderizar (dd/mm/aaaa hh:mm) — antes usava campo
+    # inexistente (timestamp) e a célula ficava vazia
+    import re
+    assert re.search(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}", body)
+    assert "203.0.113.9" in body
+
+
+def test_client_ip_prefers_forwarded_for(db):
+    from django.test import RequestFactory
+
+    from apps.core.views_web import _client_ip
+
+    req = RequestFactory().get(
+        "/", HTTP_X_FORWARDED_FOR="198.51.100.7, 10.0.0.1", REMOTE_ADDR="10.0.0.1",
+    )
+    assert _client_ip(req) == "198.51.100.7"
 
 
 def test_group_detail_lists_shared_folder(owner):
