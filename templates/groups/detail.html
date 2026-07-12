@@ -8,7 +8,7 @@
     <!-- Breadcrumb -->
     <nav aria-label="breadcrumb" class="mb-4">
         <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{% url 'group_list' %}">Grupos</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'group_list' %}">Equipes</a></li>
             <li class="breadcrumb-item active">{{ group.name }}</li>
         </ol>
     </nav>
@@ -94,7 +94,7 @@
                                     </button>
                                 </form>
                                 <form method="post" action="{% url 'group_remove_member' group.id m.user.id %}" class="d-inline"
-                                      onsubmit="return confirm('Remover {{ m.user.get_full_name }} do grupo?');">
+                                      onsubmit="return confirm('Remover {{ m.user.get_full_name }} da equipe?');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Remover">
                                         <i class="bi bi-person-dash"></i>
@@ -107,7 +107,7 @@
                 </table>
             </div>
             {% else %}
-            <p class="text-muted text-center mb-0">Nenhum membro neste grupo.</p>
+            <p class="text-muted text-center mb-0">Nenhum membro nesta equipe.</p>
             {% endif %}
         </div>
     </div>
@@ -142,7 +142,7 @@
         </ul>
         {% else %}
         <div class="card-body text-center py-4">
-            <p class="text-muted mb-0">Nenhum recurso compartilhado com este grupo.</p>
+            <p class="text-muted mb-0">Nenhum recurso compartilhado com esta equipe.</p>
         </div>
         {% endif %}
     </div>

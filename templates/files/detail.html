@@ -194,7 +194,7 @@
                         <input type="radio" class="btn-check" id="fst-user" value="user" x-model="shareType">
                         <label class="btn btn-outline-primary btn-sm" for="fst-user"><i class="bi bi-person me-1"></i>Usuário</label>
                         <input type="radio" class="btn-check" id="fst-group" value="group" x-model="shareType">
-                        <label class="btn btn-outline-primary btn-sm" for="fst-group"><i class="bi bi-people me-1"></i>Grupo</label>
+                        <label class="btn btn-outline-primary btn-sm" for="fst-group"><i class="bi bi-people me-1"></i>Equipe</label>
                     </div>
                     <div class="mb-3" x-show="shareType === 'user'">
                         <input type="text" name="user_query" class="form-control form-control-sm"
@@ -202,7 +202,7 @@
                     </div>
                     <div class="mb-3" x-show="shareType === 'group'">
                         <select name="group_id" class="form-select form-select-sm" x-model="groupId">
-                            <option value="">Selecione um grupo…</option>
+                            <option value="">Selecione uma equipe…</option>
                             {% for g in shareable_groups %}
                             <option value="{{ g.pk }}">{{ g.name }}</option>
                             {% endfor %}
@@ -225,7 +225,7 @@
         {% if group_access %}
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-transparent">
-                <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>Grupos com acesso</h6>
+                <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>Equipes com acesso</h6>
             </div>
             <ul class="list-group list-group-flush">
                 {% for ga in group_access %}
@@ -240,7 +240,7 @@
                     <form method="post" action="{% url 'file_unshare_group' file.pk %}">
                         {% csrf_token %}
                         <input type="hidden" name="group_id" value="{{ ga.group.pk }}">
-                        <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Revogar acesso do grupo">
+                        <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Revogar acesso da equipe">
                             <i class="bi bi-x-lg"></i>
                         </button>
                     </form>

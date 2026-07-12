@@ -190,7 +190,7 @@ def test_nav_files(page: Page):
 
 def test_nav_groups(page: Page):
     _login(page)
-    page.locator(".sidebar").get_by_role("link", name=re.compile("Grupos")).click()
+    page.locator(".sidebar").get_by_role("link", name=re.compile("Equipes")).click()
     expect(page).to_have_url(f"{BASE}/groups/")
 
 

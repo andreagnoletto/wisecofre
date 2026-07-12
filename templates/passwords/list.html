@@ -142,19 +142,19 @@
                     <input type="radio" class="btn-check" name="share_type" id="lst-user" value="user" checked>
                     <label class="btn btn-outline-primary" for="lst-user"><i class="bi bi-person me-1"></i>Usuário</label>
                     <input type="radio" class="btn-check" name="share_type" id="lst-group" value="group">
-                    <label class="btn btn-outline-primary" for="lst-group"><i class="bi bi-people me-1"></i>Grupo</label>
+                    <label class="btn btn-outline-primary" for="lst-group"><i class="bi bi-people me-1"></i>Equipe</label>
                 </div>
                 <div class="mb-3" data-share-target="user">
                     <label for="lst-user-email" class="form-label fw-semibold">Usuário</label>
                     <input type="text" name="user_email" id="lst-user-email" class="form-control" placeholder="E-mail do usuário">
                 </div>
                 <div class="mb-3 d-none" data-share-target="group">
-                    <label for="lst-group-id" class="form-label fw-semibold">Grupo</label>
+                    <label for="lst-group-id" class="form-label fw-semibold">Equipe</label>
                     <select name="group_id" id="lst-group-id" class="form-select">
                         {% for g in shareable_groups %}
                         <option value="{{ g.pk }}">{{ g.name }}</option>
                         {% empty %}
-                        <option value="" disabled>Você não participa de nenhum grupo</option>
+                        <option value="" disabled>Você não participa de nenhuma equipe</option>
                         {% endfor %}
                     </select>
                 </div>

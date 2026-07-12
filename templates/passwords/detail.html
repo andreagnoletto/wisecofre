@@ -149,7 +149,7 @@
                 </ul>
                 {% if group_access %}
                 <hr class="my-3">
-                <div class="small text-muted mb-2"><i class="bi bi-people-fill me-1"></i>Grupos</div>
+                <div class="small text-muted mb-2"><i class="bi bi-people-fill me-1"></i>Equipes</div>
                 <ul class="list-unstyled mb-0">
                     {% for ga in group_access %}
                     <li class="d-flex align-items-center gap-2 {% if not forloop.last %}mb-2 pb-2 border-bottom{% endif %}">
@@ -164,7 +164,7 @@
                         <form method="post" action="{% url 'password_unshare_group' resource.pk %}">
                             {% csrf_token %}
                             <input type="hidden" name="group_id" value="{{ ga.group.pk }}">
-                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Revogar acesso do grupo">
+                            <button type="submit" class="btn btn-sm btn-outline-danger border-0" title="Revogar acesso da equipe">
                                 <i class="bi bi-x-lg"></i>
                             </button>
                         </form>
@@ -192,19 +192,19 @@
                     <input type="radio" class="btn-check" name="share_type" id="st-user" value="user" checked>
                     <label class="btn btn-outline-primary" for="st-user"><i class="bi bi-person me-1"></i>Usuário</label>
                     <input type="radio" class="btn-check" name="share_type" id="st-group" value="group">
-                    <label class="btn btn-outline-primary" for="st-group"><i class="bi bi-people me-1"></i>Grupo</label>
+                    <label class="btn btn-outline-primary" for="st-group"><i class="bi bi-people me-1"></i>Equipe</label>
                 </div>
                 <div class="mb-3" data-share-target="user">
                     <label for="share-user" class="form-label fw-semibold">Usuário</label>
                     <input type="text" name="user_email" id="share-user" class="form-control" placeholder="E-mail do usuário">
                 </div>
                 <div class="mb-3 d-none" data-share-target="group">
-                    <label for="share-group" class="form-label fw-semibold">Grupo</label>
+                    <label for="share-group" class="form-label fw-semibold">Equipe</label>
                     <select name="group_id" id="share-group" class="form-select">
                         {% for g in shareable_groups %}
                         <option value="{{ g.pk }}">{{ g.name }}</option>
                         {% empty %}
-                        <option value="" disabled>Você não participa de nenhum grupo</option>
+                        <option value="" disabled>Você não participa de nenhuma equipe</option>
                         {% endfor %}
                     </select>
                 </div>

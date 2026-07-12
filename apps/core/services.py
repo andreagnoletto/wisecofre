@@ -190,13 +190,13 @@ class GroupService:
     def _require_member(user, group):
         if not GroupUser.objects.filter(group=group, user=user).exists():
             if not user.is_staff:
-                raise PermissionDenied("Você não é membro deste grupo.")
+                raise PermissionDenied("Você não é membro desta equipe.")
 
     @staticmethod
     def _require_admin(user, group):
         if not GroupUser.objects.filter(group=group, user=user, is_admin=True).exists():
             if not user.is_staff:
-                raise PermissionDenied("Apenas administradores do grupo podem realizar esta ação.")
+                raise PermissionDenied("Apenas administradores da equipe podem realizar esta ação.")
 
     @staticmethod
     def list_for_user(user):
