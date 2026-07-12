@@ -367,7 +367,7 @@ def password_share(request, pk):
                 group_id=request.POST.get("group_id", ""),
                 permission_type=permission,
             )
-            messages.success(request, f"Senha compartilhada com o grupo {group.name}.")
+            messages.success(request, f"Senha compartilhada com a equipe {group.name}.")
         else:
             target = PasswordService.share(
                 request.user, pk,
@@ -387,7 +387,7 @@ def password_share(request, pk):
 def password_unshare_group(request, pk):
     try:
         PasswordService.unshare_group(request.user, pk, request.POST.get("group_id"))
-        messages.success(request, "Acesso do grupo revogado.")
+        messages.success(request, "Acesso da equipe revogado.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     return redirect("password_detail", pk=pk)
@@ -525,7 +525,7 @@ def folder_share(request, pk):
             group_id=request.POST.get("group_id", ""),
             permission_type=request.POST.get("permission", "read"),
         )
-        messages.success(request, f"Pasta compartilhada com o grupo {group.name}.")
+        messages.success(request, f"Pasta compartilhada com a equipe {group.name}.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     except ValidationError as e:
@@ -538,7 +538,7 @@ def folder_share(request, pk):
 def folder_unshare_group(request, pk):
     try:
         FolderService.unshare_group(request.user, pk, request.POST.get("group_id"))
-        messages.success(request, "Acesso do grupo revogado.")
+        messages.success(request, "Acesso da equipe revogado.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     return redirect("folder_detail", pk=pk)
@@ -564,9 +564,9 @@ def group_list(request):
         name = request.POST.get("name", "").strip()
         error = None
         if not name:
-            error = "Nome do grupo é obrigatório."
+            error = "Nome da equipe é obrigatório."
         elif Group.objects.filter(name=name, deleted_at__isnull=True).exists():
-            error = "Já existe um grupo com este nome."
+            error = "Já existe uma equipe com este nome."
         if error:
             if ajax:
                 return JsonResponse({"ok": False, "error": error}, status=400)
@@ -576,7 +576,7 @@ def group_list(request):
             GroupUser.objects.create(group=group, user=request.user, is_admin=True)
             if ajax:
                 return JsonResponse({"ok": True})
-            messages.success(request, f'Grupo "{name}" criado.')
+            messages.success(request, f'Equipe "{name}" criada.')
         return redirect("group_list")
     groups = GroupService.list_for_user(request.user)
     return render(request, "groups/list.html", {"groups": groups})
@@ -640,7 +640,7 @@ def group_edit(request, pk):
     if request.method == "POST":
         try:
             GroupService.edit(request.user, pk, request.POST.get("name", ""))
-            messages.success(request, "Grupo atualizado.")
+            messages.success(request, "Equipe atualizada.")
         except PermissionDenied:
             messages.error(request, "Sem permissão.")
     return redirect("group_detail", pk=pk)
@@ -651,7 +651,7 @@ def group_edit(request, pk):
 def group_delete(request, pk):
     try:
         GroupService.delete(request.user, pk)
-        messages.success(request, "Grupo excluído permanentemente.")
+        messages.success(request, "Equipe excluída permanentemente.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
         return redirect("group_detail", pk=pk)
@@ -667,7 +667,7 @@ def group_add_member(request, pk):
             user_id=request.POST.get("user_id", "") or None,
             email=request.POST.get("email", "") or None,
         )
-        messages.success(request, f"{target.get_full_name() or target.email} adicionado ao grupo.")
+        messages.success(request, f"{target.get_full_name() or target.email} adicionado à equipe.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     except ValidationError as e:
@@ -978,7 +978,7 @@ def file_share(request, pk):
                 group_id=request.POST.get("group_id", ""),
                 permission_type=request.POST.get("permission", "read"),
             )
-            messages.success(request, f"Arquivo compartilhado com o grupo {group.name}.")
+            messages.success(request, f"Arquivo compartilhado com a equipe {group.name}.")
         else:
             target = FileService.share(request.user, pk, request.POST.get("user_query", "").strip())
             messages.success(request, f"Arquivo compartilhado com {target.get_full_name() or target.email}.")
@@ -994,7 +994,7 @@ def file_share(request, pk):
 def file_unshare_group(request, pk):
     try:
         FileService.unshare_group(request.user, pk, request.POST.get("group_id"))
-        messages.success(request, "Acesso do grupo revogado.")
+        messages.success(request, "Acesso da equipe revogado.")
     except PermissionDenied:
         messages.error(request, "Sem permissão.")
     return redirect("file_detail", pk=pk)

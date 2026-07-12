@@ -39,6 +39,8 @@ from apps.core.views_web import (
     group_toggle_admin,
     login_view,
     logout_view,
+    password_reset_done,
+    password_reset_request,
     mfa_disable,
     mfa_setup,
     mfa_verify,
@@ -132,7 +134,9 @@ urlpatterns = [
     path("settings/test-ldap/", admin_test_ldap, name="admin_test_ldap"),
     path("settings/sso/<uuid:pk>/delete/", admin_sso_delete, name="admin_sso_delete"),
 
-    # ── Password Reset (usado no convite de usuário) ────────────────────
+    # ── Password Reset ──────────────────────────────────────────────────
+    path("reset/", password_reset_request, name="password_reset"),
+    path("reset/enviado/", password_reset_done, name="password_reset_done"),
     path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
         template_name="registration/password_reset_confirm.html",
         success_url="/login/",
