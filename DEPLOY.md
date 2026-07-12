@@ -47,6 +47,11 @@ Na configuracao do recurso no Coolify:
 
 Use **Bulk Edit** no Coolify e cole o conteudo de `.env.coolify` (ja incluso no repo).
 
+> 💡 Para uma **instalacao nova**, gere todos de uma vez: `python manage.py generate_secrets`
+> (emite SECRET_KEY, ENCRYPTION_KEY e credenciais DB/MinIO fortes). Em producao, o
+> `manage.py check` **bloqueia** o deploy se SECRET_KEY/ENCRYPTION_KEY estiverem com o
+> valor padrao inseguro, e **avisa** sobre DB/MinIO padrao (que exigem rotacao de volume).
+
 Variaveis criticas para trocar antes do primeiro deploy:
 
 | Variavel | Acao |
@@ -56,7 +61,17 @@ Variaveis criticas para trocar antes do primeiro deploy:
 | `DATABASE_URL` | Atualizar com a senha do `POSTGRES_PASSWORD` |
 | `STORAGE_ACCESS_KEY` | Escolher credencial MinIO |
 | `STORAGE_SECRET_KEY` | Escolher credencial MinIO (longa) |
-| `ENCRYPTION_KEY` | Gerar: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| `ENCRYPTION_KEY` | Gerar: `python manage.py generate_encryption_key` (ou `Fernet.generate_key()`) |
+
+> ⚠️ **ENCRYPTION_KEY** cifra as senhas e o conteúdo dos arquivos **em repouso**.
+> Use um valor forte e dedicado (NUNCA o default de exemplo) e faça **backup seguro**:
+> perder a chave = perder o acesso a todos os segredos cifrados. Trocar a chave exige
+> re-cifrar os dados existentes (não faça isso sem plano de migração). Se `ENCRYPTION_KEY`
+> ficar vazia, o sistema cai para o `SECRET_KEY` (com aviso), acoplando os segredos à sua rotação.
+
+**Após o deploy** (migração de dados legados para cifrado):
+- `python manage.py migrate` aplica a cifragem das senhas existentes automaticamente.
+- `python manage.py encrypt_existing_files` cifra os arquivos já enviados (rodar **com backup** do storage).
 
 Variaveis de seguranca (defaults corretos para producao via HTTPS):
 

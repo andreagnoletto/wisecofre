@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import BaseModel
+from apps.resources.fields import EncryptedTextField
 
 
 class ResourceType(BaseModel):
@@ -86,7 +87,7 @@ class Secret(BaseModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="secrets"
     )
-    data = models.TextField()
+    data = EncryptedTextField()
 
     class Meta(BaseModel.Meta):
         unique_together = [("resource", "user")]
@@ -99,7 +100,7 @@ class SecretHistory(BaseModel):
     secret = models.ForeignKey(
         Secret, on_delete=models.CASCADE, related_name="history"
     )
-    data = models.TextField()
+    data = EncryptedTextField()
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

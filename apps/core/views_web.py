@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.html import escape
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
+from django_ratelimit.decorators import ratelimit
 
 from apps.accounts.models import GpgKey, User
 from apps.audit.models import ActionLog
@@ -91,11 +92,16 @@ def _set_session_timeout(request):
 
 # ── Auth ──────────────────────────────────────────────────────────────────
 
+@ratelimit(key="ip", rate="20/m", method="POST", block=False)
+@ratelimit(key="post:email", rate="5/m", method="POST", block=False)
 def login_view(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
     error = None
     if request.method == "POST":
+        if getattr(request, "limited", False):
+            error = "Muitas tentativas. Aguarde alguns minutos e tente novamente."
+            return render(request, "auth/login.html", {"error": error})
         email = request.POST.get("email", "")
         password = request.POST.get("password", "")
         user = authenticate(request, username=email, password=password)
@@ -131,6 +137,7 @@ def _client_ip(request):
     return request.META.get("REMOTE_ADDR", "")
 
 
+@ratelimit(key="ip", rate="5/h", method="POST", block=False)
 def password_reset_request(request):
     """Solicitação de redefinição de senha (self-service). Envia o link via SMTP
     configurado nas Configurações (mesmo caminho do convite). A resposta é sempre
@@ -138,6 +145,9 @@ def password_reset_request(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
     if request.method == "POST":
+        if getattr(request, "limited", False):
+            # Muitas solicitações: resposta genérica, sem enviar e-mail.
+            return redirect("password_reset_done")
         email = request.POST.get("email", "").strip()
         user = User.objects.filter(
             email__iexact=email, is_active=True, deleted_at__isnull=True,
@@ -1115,7 +1125,11 @@ def profile(request):
 
 @login_required
 @require_POST
+@ratelimit(key="user", rate="10/m", method="POST", block=False)
 def profile_change_password(request):
+    if getattr(request, "limited", False):
+        messages.error(request, "Muitas tentativas. Aguarde alguns minutos.")
+        return redirect("profile")
     current = request.POST.get("current_password", "")
     new = request.POST.get("new_password", "")
     confirm = request.POST.get("confirm_password", "")
@@ -1188,12 +1202,17 @@ def mfa_setup(request):
     })
 
 
+@ratelimit(key="ip", rate="10/m", method="POST", block=False)
 def mfa_verify(request):
     user_id = request.session.get("mfa_user_id")
     if not user_id:
         return redirect("login")
     error = None
     if request.method == "POST":
+        if getattr(request, "limited", False):
+            return render(request, "mfa/verify.html", {
+                "error": "Muitas tentativas. Aguarde alguns minutos.",
+            })
         import pyotp
         from django.utils import timezone
         from apps.mfa.models import TOTPDevice, BackupCode

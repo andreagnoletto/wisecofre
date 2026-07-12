@@ -13,6 +13,7 @@ from apps.accounts.models import User
 from apps.files.models import FileResource, FileSecret
 from apps.folders.models import Folder
 from apps.groups.models import Group, GroupUser
+from apps.core.crypto import decrypt_bytes, encrypt_bytes
 from apps.resources.models import Resource, ResourceType, Secret, Tag
 from apps.sharing.models import Permission
 from apps.sharing.services import SharingService
@@ -308,7 +309,9 @@ class FileService:
         uploaded_file.seek(0)
 
         storage_key = f"files/{user.pk}/{checksum[:8]}_{uploaded_file.name}"
-        saved_path = default_storage.save(storage_key, uploaded_file)
+        # Cifra o conteúdo em repouso antes de gravar no storage.
+        encrypted = encrypt_bytes(uploaded_file.read())
+        saved_path = default_storage.save(storage_key, ContentFile(encrypted))
         cat = FileService._classify_mime(uploaded_file.content_type)
 
         rt, _ = ResourceType.objects.get_or_create(slug="file", defaults={"name": "Arquivo"})
@@ -320,6 +323,7 @@ class FileService:
             resource=resource, storage_key=saved_path, size_bytes=uploaded_file.size,
             original_name_encrypted=uploaded_file.name, mime_category=cat,
             checksum_sha256=checksum, upload_completed=True, created_by=user,
+            encryption_version=FileResource.EncryptionVersion.FERNET_V1,
         )
         FileSecret.objects.create(
             file_resource=fr, user=user, session_key_encrypted="local-storage",
@@ -337,7 +341,7 @@ class FileService:
         if not name.endswith(".txt"):
             name += ".txt"
         storage_key = f"files/{user.pk}/{checksum[:8]}_{name}"
-        saved_path = default_storage.save(storage_key, ContentFile(raw))
+        saved_path = default_storage.save(storage_key, ContentFile(encrypt_bytes(raw)))
 
         rt, _ = ResourceType.objects.get_or_create(slug="file", defaults={"name": "Arquivo"})
         resource = Resource.objects.create(
@@ -348,6 +352,7 @@ class FileService:
             resource=resource, storage_key=saved_path, size_bytes=len(raw),
             original_name_encrypted=name, mime_category="document",
             checksum_sha256=checksum, upload_completed=True, created_by=user,
+            encryption_version=FileResource.EncryptionVersion.FERNET_V1,
         )
         FileSecret.objects.create(
             file_resource=fr, user=user, session_key_encrypted="local-storage",
@@ -364,6 +369,10 @@ class FileService:
         f = default_storage.open(fr.storage_key, "rb")
         content = f.read()
         f.close()
+        # Decifra apenas o que foi gravado cifrado (fernet-v1). Arquivos legados
+        # (marcador openpgp/default) são texto puro e voltam como estão.
+        if fr.encryption_version == FileResource.EncryptionVersion.FERNET_V1:
+            content = decrypt_bytes(content)
         safe_name = fr.original_name_encrypted.replace('"', "'").replace("\n", "").replace("\r", "")
         return content, safe_name
 

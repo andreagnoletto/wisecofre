@@ -105,12 +105,27 @@ def test_logout_is_attributed_to_the_acting_user(owner):
 
 
 def test_failed_login_records_attempted_email(db):
+    from django.core.cache import cache
+    cache.clear()
     client = Client()
     client.post(reverse("login"), {"email": "ghost@x.io", "password": "wrong"})
 
     log = ActionLog.objects.filter(action="login").order_by("-created_at").first()
     assert log is not None
     assert log.context.get("email") == "ghost@x.io"
+
+
+def test_login_is_rate_limited_after_repeated_failures(db):
+    from django.core.cache import cache
+    cache.clear()
+    User.objects.create_user(username="rl", email="rl@x.io", password="correct-pass-123")
+    client = Client()
+
+    last = None
+    for _ in range(7):
+        last = client.post(reverse("login"), {"email": "rl@x.io", "password": "errada"})
+
+    assert "Muitas tentativas" in last.content.decode()
 
 
 # ── render smoke tests (pegam erros de template) ────────────────────────────

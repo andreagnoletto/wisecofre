@@ -11,6 +11,7 @@ class FileResource(BaseModel):
 
     class EncryptionVersion(models.TextChoices):
         OPENPGP_V1 = "openpgp-aes256gcm-v1", "OpenPGP + AES-256-GCM v1"
+        FERNET_V1 = "fernet-v1", "Fernet (cifragem em repouso no servidor) v1"
 
     resource = models.OneToOneField(
         "resources.Resource",

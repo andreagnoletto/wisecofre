@@ -28,7 +28,16 @@ Gerenciador de senhas, arquivos e segredos com criptografia — alternativa self
 
 ## Dev Local (Docker)
 
-Tudo roda num unico `docker-compose.yml` (web, db, minio):
+Tudo roda num unico `docker-compose.yml` (web, db, minio).
+
+Antes de subir, defina uma `ENCRYPTION_KEY` (cifragem em repouso das senhas/arquivos)
+no ambiente — forte, permanente e com backup (perde-la = perder os segredos cifrados):
+
+```bash
+# gera uma chave; cole em ENCRYPTION_KEY (.env / Coolify)
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# (apos o deploy, o equivalente e: python manage.py generate_encryption_key)
+```
 
 ```bash
 docker compose up -d --build
@@ -54,7 +63,11 @@ cp .env.example .env
 # 3. Instalar dependencias
 uv sync
 
-# 4. Migrations e servidor
+# 4. Gerar a ENCRYPTION_KEY (cifragem em repouso) e colar no .env
+#    Guarde-a com seguranca: perder a chave = perder os segredos cifrados.
+uv run python manage.py generate_encryption_key
+
+# 5. Migrations e servidor
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
 uv run python manage.py runserver 8003
