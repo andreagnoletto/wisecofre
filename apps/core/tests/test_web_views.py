@@ -7,7 +7,7 @@ from apps.audit.models import ActionLog
 from apps.files.models import FileAccessLog, FileResource, FileSecret
 from apps.folders.models import Folder
 from apps.groups.models import Group, GroupUser
-from apps.resources.models import Resource, ResourceType, Secret
+from apps.resources.models import Resource, ResourceType, Secret, SecretHistory
 
 
 @pytest.fixture
@@ -181,6 +181,46 @@ def test_group_detail_lists_shared_password(owner):
     assert resp.status_code == 200
     assert len(resp.context["shared_resources"]) == 1
     assert resource.name in resp.content.decode()
+
+
+def test_password_update_records_secret_history(owner):
+    from apps.core.services import PasswordService
+
+    resource = make_password(owner, data="v1")
+    PasswordService.update(owner, resource.pk, name="p", secret_data="v2")
+
+    hist = SecretHistory.objects.filter(secret__resource=resource, secret__user=owner)
+    assert hist.count() == 1
+    entry = hist.first()
+    assert entry.created_by_id == owner.pk
+    assert entry.data == "v1"  # guarda a versão anterior
+
+
+def test_password_update_without_new_secret_keeps_history_empty(owner):
+    from apps.core.services import PasswordService
+
+    resource = make_password(owner, data="v1")
+    PasswordService.update(owner, resource.pk, name="novo nome")  # sem secret_data
+
+    assert SecretHistory.objects.filter(secret__resource=resource).count() == 0
+
+
+def test_password_history_reflects_edits_not_shared_copies(owner, other):
+    from apps.core.services import PasswordService
+
+    resource = make_password(owner, data="v1")
+    # cópia por-usuário (compartilhamento) NÃO deve contar como versão
+    Secret.objects.create(resource=resource, user=other, data="v1")
+    PasswordService.update(owner, resource.pk, name="p", secret_data="v2")
+    PasswordService.update(owner, resource.pk, name="p", secret_data="v3")
+
+    client = Client()
+    client.force_login(owner)
+    resp = client.get(reverse("password_detail", args=[resource.pk]))
+
+    versions = list(resp.context["secret_versions"])
+    assert len(versions) == 2
+    assert all(v.created_by_id == owner.pk for v in versions)
 
 
 def test_file_detail_shows_access_log_date(owner):

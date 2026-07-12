@@ -112,7 +112,7 @@
                             {% for version in secret_versions %}
                             <tr>
                                 <td>{{ forloop.counter }}</td>
-                                <td>{{ version.changed_by|default:"—" }}</td>
+                                <td>{% if version.created_by %}{{ version.created_by.get_full_name|default:version.created_by.email }}{% else %}—{% endif %}</td>
                                 <td class="small text-muted">{{ version.created_at|date:"d/m/Y H:i" }}</td>
                             </tr>
                             {% empty %}

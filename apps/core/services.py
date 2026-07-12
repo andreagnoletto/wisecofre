@@ -77,8 +77,14 @@ class PasswordService:
         resource.save()
         if secret_data:
             if secret:
-                secret.data = secret_data
-                secret.save()
+                if secret.data != secret_data:
+                    # guarda a versão anterior antes de sobrescrever
+                    from apps.resources.models import SecretHistory
+                    SecretHistory.objects.create(
+                        secret=secret, data=secret.data, created_by=user,
+                    )
+                    secret.data = secret_data
+                    secret.save()
             else:
                 Secret.objects.create(resource=resource, user=user, data=secret_data)
         return resource, secret

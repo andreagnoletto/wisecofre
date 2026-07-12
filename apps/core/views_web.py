@@ -18,7 +18,7 @@ from apps.core.services import (
 from apps.files.models import FileAccessLog, FileResource, FileSecret
 from apps.folders.models import Folder
 from apps.groups.models import Group, GroupUser
-from apps.resources.models import Favorite, Resource, ResourceType, Secret, Tag
+from apps.resources.models import Favorite, Resource, ResourceType, Secret, SecretHistory, Tag
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────
@@ -300,7 +300,11 @@ def password_detail(request, pk):
             perm_label = "Leitura" if perm and perm.type == Permission.READ else "Leitura/Escrita"
             access_list.append({"user": u, "permission": perm_label})
     group_access = _group_access_list(permissions)
-    history = resource.secrets.all().order_by("-created_at")
+    # histórico real de versões = alterações do segredo do próprio usuário
+    if secret:
+        history = secret.history.select_related("created_by").order_by("-created_at")
+    else:
+        history = SecretHistory.objects.none()
     can_manage = resource.created_by == request.user or request.user.is_staff
     return render(request, "passwords/detail.html", {
         "resource": resource, "secret": secret,
