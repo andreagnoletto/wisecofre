@@ -200,6 +200,10 @@ def dashboard(request):
         recent_logs = ActionLog.objects.select_related("user").order_by("-created_at")[:10]
     else:
         recent_logs = ActionLog.objects.filter(user=user).order_by("-created_at")[:10]
+    from apps.audit.middleware import ROUTE_LABELS
+    recent_logs = list(recent_logs)
+    for log in recent_logs:
+        log.action_label = ROUTE_LABELS.get(log.action, log.action)
     return render(request, "dashboard.html", {
         "total_passwords": total_passwords,
         "shared_with_me": shared_with_me,

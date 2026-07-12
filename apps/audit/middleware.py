@@ -60,6 +60,12 @@ def _get_ip(request):
 class AuditMiddleware(MiddlewareMixin):
     """Logs all state-changing requests (POST/PUT/PATCH/DELETE) and sensitive GET reads."""
 
+    def process_request(self, request):
+        # Captura o usuário autenticado ANTES da view. Necessário para o logout:
+        # logout() zera request.user, então no process_response ele já é anônimo.
+        if hasattr(request, "user") and request.user.is_authenticated:
+            request._audit_actor = request.user
+
     def process_response(self, request, response):
         try:
             match = resolve(request.path)
@@ -83,6 +89,12 @@ class AuditMiddleware(MiddlewareMixin):
             return response
 
         user = request.user if hasattr(request, "user") and request.user.is_authenticated else None
+        if user is None:
+            # Ações que terminam anônimas mas foram feitas por um usuário logado
+            # (ex.: logout) são atribuídas ao ator capturado antes da view.
+            actor = getattr(request, "_audit_actor", None)
+            if actor is not None and getattr(actor, "is_authenticated", False):
+                user = actor
         is_success = 200 <= response.status_code < 400
 
         context = {}

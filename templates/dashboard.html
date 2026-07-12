@@ -73,8 +73,12 @@
                             {% for log in recent_logs %}
                             <tr>
                                 <td class="text-nowrap small text-muted">{{ log.created_at|date:"d/m/Y H:i" }}</td>
-                                <td>{{ log.user }}</td>
-                                <td>{{ log.action }}</td>
+                                <td>
+                                    {% if log.user %}{{ log.user.get_full_name|default:log.user.email }}
+                                    {% elif log.context.email %}{{ log.context.email }}
+                                    {% else %}<span class="text-muted">Anônimo</span>{% endif %}
+                                </td>
+                                <td>{{ log.action_label|default:log.action }}</td>
                                 <td>
                                     {% if log.status == "success" %}
                                         <span class="badge bg-success-subtle text-success">Sucesso</span>

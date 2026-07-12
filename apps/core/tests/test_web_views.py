@@ -93,6 +93,17 @@ def test_file_list_inside_folder_shows_its_files(owner):
 
 # ── #5 audit captures email on anonymous login ──────────────────────────────
 
+def test_logout_is_attributed_to_the_acting_user(owner):
+    client = Client()
+    client.force_login(owner)
+
+    client.post(reverse("logout"))
+
+    log = ActionLog.objects.filter(action="logout").order_by("-created_at").first()
+    assert log is not None
+    assert log.user_id == owner.pk  # nao pode ser None (o usuario acabou de deslogar)
+
+
 def test_failed_login_records_attempted_email(db):
     client = Client()
     client.post(reverse("login"), {"email": "ghost@x.io", "password": "wrong"})
