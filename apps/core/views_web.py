@@ -201,9 +201,12 @@ def dashboard(request):
     total_passwords = Secret.objects.filter(user=user).count()
     shared_with_me = Secret.objects.filter(user=user).exclude(resource__created_by=user).count()
     total_files = FileSecret.objects.filter(user=user).count()
-    expired_resources = Resource.objects.filter(
-        secrets__user=user, expired_at__isnull=False
-    ).distinct()[:5]
+    from django.utils import timezone
+    expired_qs = Resource.objects.filter(
+        secrets__user=user, expired_at__lte=timezone.now()
+    ).distinct()
+    expired_count = expired_qs.count()
+    expired_resources = expired_qs.order_by("expired_at")[:5]
     if user.is_staff:
         recent_logs = ActionLog.objects.select_related("user").order_by("-created_at")[:10]
     else:
@@ -216,7 +219,7 @@ def dashboard(request):
         "total_passwords": total_passwords,
         "shared_with_me": shared_with_me,
         "total_files": total_files,
-        "expired_count": expired_resources.count(),
+        "expired_count": expired_count,
         "expired_resources": expired_resources,
         "recent_logs": recent_logs,
     })

@@ -241,6 +241,32 @@ def test_settings_page_shows_security_status(db):
     assert "Cifragem em repouso" in body
 
 
+def test_dashboard_counts_only_past_due_as_expired(owner):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    rt, _ = ResourceType.objects.get_or_create(slug="password", defaults={"name": "Senha"})
+    past = Resource.objects.create(
+        name="venceu", resource_type=rt, created_by=owner,
+        expired_at=timezone.now() - timedelta(days=1),
+    )
+    Secret.objects.create(resource=past, user=owner, data="x")
+    future = Resource.objects.create(
+        name="futuro", resource_type=rt, created_by=owner,
+        expired_at=timezone.now() + timedelta(days=30),
+    )
+    Secret.objects.create(resource=future, user=owner, data="x")
+
+    client = Client()
+    client.force_login(owner)
+    resp = client.get(reverse("dashboard"))
+
+    assert resp.status_code == 200
+    assert resp.context["expired_count"] == 1  # só a vencida, não a futura
+    assert "Nova senha" in resp.content.decode()  # ações rápidas presentes
+
+
 def test_audit_pagination_and_search(db):
     admin = User.objects.create_user(
         username="ad", email="ad@x.io", password="x", role="ADMIN", is_staff=True,
