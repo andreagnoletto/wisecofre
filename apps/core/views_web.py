@@ -1084,14 +1084,33 @@ def audit_logs(request):
     status_filter = request.GET.get("status", "")
     if status_filter:
         logs = logs.filter(status=status_filter.lower())
+    q = request.GET.get("q", "").strip()
+    if q:
+        from django.db.models import Q
+        logs = logs.filter(
+            Q(user__email__icontains=q)
+            | Q(ip_address__icontains=q)
+            | Q(action__icontains=q)
+        )
+    date_from = request.GET.get("from", "")
+    if date_from:
+        logs = logs.filter(created_at__date__gte=date_from)
+    date_to = request.GET.get("to", "")
+    if date_to:
+        logs = logs.filter(created_at__date__lte=date_to)
+
+    from django.core.paginator import Paginator
+    page_obj = Paginator(logs, 50).get_page(request.GET.get("page"))
+
     from apps.audit.middleware import ROUTE_LABELS
-    log_list = list(logs[:200])
-    for log in log_list:
+    object_list = list(page_obj.object_list)
+    for log in object_list:
         log.action_label = ROUTE_LABELS.get(log.action, log.action)
         log.detail_text = _audit_detail_text(log)
     action_choices = ActionLog.objects.values_list("action", flat=True).distinct().order_by("action")
     return render(request, "audit/list.html", {
-        "logs": log_list,
+        "logs": object_list,
+        "page_obj": page_obj,
         "filter_users": User.objects.filter(deleted_at__isnull=True),
         "action_choices": [(a, ROUTE_LABELS.get(a, a)) for a in action_choices],
     })

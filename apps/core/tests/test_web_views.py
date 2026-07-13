@@ -241,6 +241,30 @@ def test_settings_page_shows_security_status(db):
     assert "Cifragem em repouso" in body
 
 
+def test_audit_pagination_and_search(db):
+    admin = User.objects.create_user(
+        username="ad", email="ad@x.io", password="x", role="ADMIN", is_staff=True,
+    )
+    for i in range(60):
+        ActionLog.objects.create(
+            user=admin, action="login", status="success", ip_address=f"10.0.0.{i}",
+        )
+    ActionLog.objects.create(
+        user=admin, action="login", status="success", ip_address="203.0.113.77",
+    )
+    client = Client()
+    client.force_login(admin)
+
+    resp = client.get(reverse("audit_logs"))
+    assert resp.status_code == 200
+    assert resp.context["page_obj"].paginator.num_pages >= 2
+    assert len(resp.context["logs"]) == 50  # página cheia
+
+    # busca por IP filtra
+    resp2 = client.get(reverse("audit_logs"), {"q": "203.0.113.77"})
+    assert resp2.context["page_obj"].paginator.count == 1
+
+
 def test_audit_detail_shows_resource_name(db):
     admin = User.objects.create_user(
         username="a", email="a@x.io", password="x", role="ADMIN", is_staff=True,

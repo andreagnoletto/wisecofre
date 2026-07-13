@@ -35,7 +35,19 @@
                         <option value="fail" {% if request.GET.status == "fail" %}selected{% endif %}>Falha</option>
                     </select>
                 </div>
-                <div class="col-md-4 d-flex gap-2">
+                <div class="col-md-3">
+                    <label class="form-label small">Busca</label>
+                    <input type="text" name="q" value="{{ request.GET.q }}" class="form-control form-control-sm" placeholder="e-mail, IP, ação…">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">De</label>
+                    <input type="date" name="from" value="{{ request.GET.from }}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Até</label>
+                    <input type="date" name="to" value="{{ request.GET.to }}" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-5 d-flex gap-2">
                     <button type="submit" class="btn btn-primary btn-sm flex-fill">
                         <i class="bi bi-funnel me-1"></i> Filtrar
                     </button>
@@ -95,5 +107,20 @@
             </table>
         </div>
     </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="small text-muted">{{ page_obj.paginator.count }} registro(s) — página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        <ul class="pagination pagination-sm mb-0">
+            {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.previous_page_number %}">&laquo;</a></li>
+            {% endif %}
+            <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+            {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="{% querystring page=page_obj.next_page_number %}">&raquo;</a></li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
 {% endblock %}
