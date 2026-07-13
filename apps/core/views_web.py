@@ -1317,8 +1317,22 @@ def admin_settings(request):
             env_val = getattr(django_settings, key, None)
             configs[key] = env_val if env_val not in (None, "") else default
     sso_providers = SSOProvider.objects.all().order_by("-created_at")
+
+    from apps.core.checks import security_overall, security_status
+    _badge = {"ok": "success", "warn": "warning", "error": "danger"}
+    _icon = {"ok": "check-circle-fill", "warn": "exclamation-triangle-fill", "error": "x-circle-fill"}
+    sec_items = security_status()
+    for it in sec_items:
+        it["badge"] = _badge[it["level"]]
+        it["icon"] = _icon[it["level"]]
+    overall = security_overall(sec_items)
+    overall_label = {"ok": "Tudo seguro", "warn": "Atenção", "error": "Ação necessária"}[overall]
+
     return render(request, "admin_settings/index.html", {
         "configs": configs, "sso_providers": sso_providers,
+        "security_items": sec_items,
+        "security_overall_badge": _badge[overall],
+        "security_overall_label": overall_label,
     })
 
 

@@ -23,6 +23,68 @@ _WEAK_DB_PASSWORD = "wc-db-p4ss-2026"
 _HINT = "Gere valores fortes (python manage.py generate_secrets) e defina via variáveis de ambiente."
 
 
+def security_status():
+    """Postura de segurança para exibir ao admin na tela de Configurações.
+
+    Retorna uma lista de itens {label, level, detail} — SEM revelar valores de
+    segredos. `level` ∈ {"ok", "warn", "error"}."""
+    items = []
+
+    def add(label, level, detail):
+        items.append({"label": label, "level": level, "detail": detail})
+
+    enc = getattr(settings, "ENCRYPTION_KEY", "") or ""
+    if enc == _WEAK_BLOCKING["ENCRYPTION_KEY"]:
+        add("Cifragem em repouso", "error", "ENCRYPTION_KEY está com o valor padrão inseguro.")
+    elif not enc:
+        add("Cifragem em repouso", "warn", "Sem ENCRYPTION_KEY dedicada (usando SECRET_KEY como fallback).")
+    else:
+        add("Cifragem em repouso", "ok", "ENCRYPTION_KEY dedicada configurada.")
+
+    if settings.SECRET_KEY == _WEAK_BLOCKING["SECRET_KEY"]:
+        add("Chave do Django (SECRET_KEY)", "error", "Está com o valor padrão inseguro.")
+    else:
+        add("Chave do Django (SECRET_KEY)", "ok", "Definida.")
+
+    weak_infra = [n for n, w in _WEAK_WARN.items() if getattr(settings, n, None) == w]
+    db = (settings.DATABASES or {}).get("default", {})
+    if (db.get("PASSWORD") or "") == _WEAK_DB_PASSWORD:
+        weak_infra.append("DB")
+    if weak_infra:
+        add("Credenciais de infraestrutura (DB/MinIO)", "warn",
+            "Alguma credencial está no valor padrão — rotacionar (exige rotação de volume).")
+    else:
+        add("Credenciais de infraestrutura (DB/MinIO)", "ok", "Sem valores padrão detectados.")
+
+    if settings.DEBUG:
+        add("Modo DEBUG", "error", "DEBUG está ligado — não deve ficar ligado em produção.")
+    else:
+        add("Modo DEBUG", "ok", "Desligado.")
+
+    if getattr(settings, "SESSION_COOKIE_SECURE", False):
+        add("Cookies seguros (HTTPS)", "ok", "Sessão/CSRF apenas por HTTPS.")
+    else:
+        add("Cookies seguros (HTTPS)", "warn",
+            "SESSION_COOKIE_SECURE desligado (ok em dev; ligar em produção).")
+
+    if "rest_framework_simplejwt.token_blacklist" in settings.INSTALLED_APPS:
+        add("Revogação de tokens (JWT)", "ok", "Blacklist habilitada.")
+    else:
+        add("Revogação de tokens (JWT)", "warn", "Blacklist não habilitada.")
+
+    return items
+
+
+def security_overall(items):
+    """'error' se houver qualquer erro; senão 'warn' se houver avisos; senão 'ok'."""
+    levels = {i["level"] for i in items}
+    if "error" in levels:
+        return "error"
+    if "warn" in levels:
+        return "warn"
+    return "ok"
+
+
 @register("security")
 def check_weak_default_secrets(app_configs, **kwargs):
     issues = []

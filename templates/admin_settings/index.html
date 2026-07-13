@@ -65,6 +65,28 @@
 
         <!-- Segurança -->
         <div x-show="tab === 'seguranca'" x-transition style="display:none;">
+            <!-- Status de Segurança (somente leitura; nao revela valores de segredos) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Status de Segurança</h5>
+                    <span class="badge bg-{{ security_overall_badge }}">{{ security_overall_label }}</span>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for item in security_items %}
+                    <li class="list-group-item d-flex align-items-start gap-3">
+                        <i class="bi bi-{{ item.icon }} text-{{ item.badge }} fs-5"></i>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold">{{ item.label }}</div>
+                            <div class="small text-muted">{{ item.detail }}</div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <div class="card-footer bg-white small text-muted">
+                    Verificação automática. Não exibe os valores dos segredos — apenas se estão seguros.
+                </div>
+            </div>
+
             <div class="card shadow-sm">
                 <div class="card-header bg-white"><h5 class="mb-0">Segurança</h5></div>
                 <div class="card-body">

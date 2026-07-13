@@ -2,7 +2,45 @@ from io import StringIO
 
 from django.core.management import call_command
 
-from apps.core.checks import check_weak_default_secrets
+from apps.core.checks import (
+    check_weak_default_secrets,
+    security_overall,
+    security_status,
+)
+
+
+def _item(items, label):
+    return next(i for i in items if i["label"] == label)
+
+
+def test_security_status_ok_with_strong_encryption(settings):
+    settings.DEBUG = False
+    settings.SECRET_KEY = "forte-xyz"
+    settings.ENCRYPTION_KEY = "forte-dedicada"
+
+    items = security_status()
+
+    assert _item(items, "Cifragem em repouso")["level"] == "ok"
+    assert _item(items, "Chave do Django (SECRET_KEY)")["level"] == "ok"
+
+
+def test_security_status_flags_weak_encryption(settings):
+    settings.ENCRYPTION_KEY = "wc-encr1pt10n-k3y-ch4ng3-m3-2026"
+
+    items = security_status()
+
+    assert _item(items, "Cifragem em repouso")["level"] == "error"
+    assert security_overall(items) == "error"
+
+
+def test_security_status_never_exposes_values(settings):
+    settings.SECRET_KEY = "valor-super-secreto-nao-vazar"
+    settings.ENCRYPTION_KEY = "outro-segredo-nao-vazar"
+
+    blob = " ".join(i["label"] + i["detail"] for i in security_status())
+
+    assert "valor-super-secreto-nao-vazar" not in blob
+    assert "outro-segredo-nao-vazar" not in blob
 
 
 def test_generate_secrets_outputs_all_keys():

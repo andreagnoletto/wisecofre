@@ -165,6 +165,21 @@ def test_files_list_renders_folders(owner):
     assert "Docs" in resp.content.decode()
 
 
+def test_settings_page_shows_security_status(db):
+    admin = User.objects.create_user(
+        username="s", email="s@x.io", password="x", role="ADMIN", is_staff=True,
+    )
+    client = Client()
+    client.force_login(admin)
+
+    resp = client.get(reverse("admin_settings"))
+
+    assert resp.status_code == 200
+    body = resp.content.decode()
+    assert "Status de Segurança" in body
+    assert "Cifragem em repouso" in body
+
+
 def test_audit_detail_shows_resource_name(db):
     admin = User.objects.create_user(
         username="a", email="a@x.io", password="x", role="ADMIN", is_staff=True,
