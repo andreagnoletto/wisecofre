@@ -25,6 +25,26 @@ def test_text_file_content_is_encrypted_at_rest(db):
     assert content == b"conteudo-super-secreto"
 
 
+def test_upload_storage_key_has_no_path_traversal_or_name_leak(db):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    ResourceType.objects.get_or_create(slug="file", defaults={"name": "Arquivo"})
+    user = User.objects.create_user(username="pt", email="pt@x.io", password="x")
+    evil = SimpleUploadedFile(
+        "../../../etc/senha-secreta.txt", b"conteudo", content_type="text/plain"
+    )
+
+    fr = FileService.upload(user, evil)
+
+    assert ".." not in fr.storage_key
+    assert "etc" not in fr.storage_key
+    assert "senha-secreta" not in fr.storage_key  # nome cru não vaza no caminho
+    assert fr.storage_key.endswith(".txt")
+    # e continua recuperável
+    content, _ = FileService.download(user, fr.pk)
+    assert content == b"conteudo"
+
+
 def test_download_of_legacy_plaintext_file_still_works(db):
     """Arquivos antigos (sem marcador fernet) continuam sendo lidos como estão."""
     from django.core.files.base import ContentFile

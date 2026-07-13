@@ -1431,6 +1431,15 @@ def admin_sso_delete(request, pk):
     return redirect("admin_settings")
 
 
+def _csv_safe(value):
+    """Neutraliza formula/CSV injection: prefixa com ' as células que começam
+    com =, +, -, @, tab ou CR (o IP vem do X-Forwarded-For, controlável)."""
+    s = "" if value is None else str(value)
+    if s and s[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + s
+    return s
+
+
 @login_required
 @user_passes_test(is_staff)
 def audit_export_csv(request):
@@ -1440,9 +1449,9 @@ def audit_export_csv(request):
     writer = csv.writer(response)
     writer.writerow(["Data", "Usuário", "Ação", "Status", "IP"])
     for log in ActionLog.objects.select_related("user").order_by("-created_at")[:1000]:
-        writer.writerow([
+        writer.writerow([_csv_safe(v) for v in (
             log.created_at.isoformat(),
             log.user.email if log.user else "-",
             log.action, log.status, log.ip_address,
-        ])
+        )])
     return response

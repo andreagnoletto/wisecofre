@@ -64,7 +64,17 @@ class ResourceViewSet(ModelViewSet):
         if request.method == "GET":
             secrets = Secret.objects.filter(resource=resource, user=request.user)
             return Response(SecretSerializer(secrets, many=True).data)
-        # PUT
+        # PUT — exige permissão de escrita (como a camada web), não só leitura.
+        if resource.created_by != request.user and not request.user.is_staff:
+            from apps.sharing.models import Permission
+            can_write = Permission.objects.filter(
+                aco="Resource", aco_foreign_key=resource.pk,
+                aro="User", aro_foreign_key=request.user.pk,
+                type__gte=Permission.UPDATE,
+            ).exists()
+            if not can_write:
+                from rest_framework.exceptions import PermissionDenied
+                raise PermissionDenied("Sem permissão de escrita neste recurso.")
         secret, created = Secret.objects.get_or_create(
             resource=resource,
             user=request.user,

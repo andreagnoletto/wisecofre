@@ -165,6 +165,22 @@ def test_files_list_renders_folders(owner):
     assert "Docs" in resp.content.decode()
 
 
+def test_audit_export_neutralizes_formula_injection(db):
+    admin = User.objects.create_user(
+        username="ax", email="ax@x.io", password="x", role="ADMIN", is_staff=True,
+    )
+    ActionLog.objects.create(
+        user=admin, action="=SUM(A1)", status="success", ip_address="1.1.1.1",
+    )
+    client = Client()
+    client.force_login(admin)
+
+    resp = client.get(reverse("audit_export_csv"))
+
+    body = resp.content.decode()
+    assert "'=SUM(A1)" in body  # célula neutralizada com aspa simples
+
+
 def test_settings_page_shows_security_status(db):
     admin = User.objects.create_user(
         username="s", email="s@x.io", password="x", role="ADMIN", is_staff=True,

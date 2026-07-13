@@ -284,6 +284,17 @@ class FileService:
         return fr, secret
 
     @staticmethod
+    def _storage_key(user_pk, checksum, filename):
+        """Monta a chave do storage a partir do checksum + extensão sanitizada.
+        Não usa o nome de arquivo cru (evita path traversal e vazamento do nome
+        no caminho do bucket). O nome original é guardado em original_name."""
+        import os
+
+        ext = os.path.splitext(os.path.basename(filename or ""))[1].lower()
+        ext = "".join(c for c in ext if c.isalnum() or c == ".")[:12]
+        return f"files/{user_pk}/{checksum}{ext}"
+
+    @staticmethod
     def _classify_mime(mime):
         mime = mime or ""
         if "image" in mime:
@@ -308,7 +319,7 @@ class FileService:
         checksum = hasher.hexdigest()
         uploaded_file.seek(0)
 
-        storage_key = f"files/{user.pk}/{checksum[:8]}_{uploaded_file.name}"
+        storage_key = FileService._storage_key(user.pk, checksum, uploaded_file.name)
         # Cifra o conteúdo em repouso antes de gravar no storage.
         encrypted = encrypt_bytes(uploaded_file.read())
         saved_path = default_storage.save(storage_key, ContentFile(encrypted))
@@ -340,7 +351,7 @@ class FileService:
         checksum = hashlib.sha256(raw).hexdigest()
         if not name.endswith(".txt"):
             name += ".txt"
-        storage_key = f"files/{user.pk}/{checksum[:8]}_{name}"
+        storage_key = FileService._storage_key(user.pk, checksum, name)
         saved_path = default_storage.save(storage_key, ContentFile(encrypt_bytes(raw)))
 
         rt, _ = ResourceType.objects.get_or_create(slug="file", defaults={"name": "Arquivo"})

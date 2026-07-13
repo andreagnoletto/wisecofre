@@ -1,11 +1,19 @@
 from rest_framework import status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Group, GroupUser
 from .serializers import GroupSerializer, GroupUserSerializer
+
+
+def _require_group_admin(user, group):
+    if user.is_staff:
+        return
+    if not GroupUser.objects.filter(group=group, user=user, is_admin=True).exists():
+        raise PermissionDenied("Apenas administradores da equipe podem gerenciar membros.")
 
 
 class GroupViewSet(ModelViewSet):
@@ -30,6 +38,7 @@ class GroupViewSet(ModelViewSet):
             return Response(GroupUserSerializer(members, many=True).data)
 
         if request.method == "POST":
+            _require_group_admin(request.user, group)
             user_id = request.data.get("user_id")
             is_admin = request.data.get("is_admin", False)
             membership, created = GroupUser.objects.get_or_create(
@@ -47,6 +56,7 @@ class GroupViewSet(ModelViewSet):
             )
 
         # DELETE
+        _require_group_admin(request.user, group)
         user_id = request.data.get("user_id")
         deleted, _ = GroupUser.objects.filter(group=group, user_id=user_id).delete()
         if deleted:

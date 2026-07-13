@@ -1,7 +1,7 @@
 [project]
 name = "wisecofre"
 version = "1.0.0"
-description = "Gerenciador de senhas e segredos para times — self-hosted, E2E encrypted"
+description = "Gerenciador de senhas e segredos para times — self-hosted, com cifragem em repouso no servidor"
 requires-python = ">=3.13"
 license = "MIT"
 dependencies = [

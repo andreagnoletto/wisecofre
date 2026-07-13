@@ -63,6 +63,42 @@ def test_share_resource_ignores_attacker_supplied_secret_data(owner, victim):
     assert Secret.objects.get(resource=resource, user=victim).data == "segredo-real"
 
 
+def test_group_add_member_requires_admin_via_api(owner, attacker, victim):
+    from apps.groups.models import Group, GroupUser
+
+    group = Group.objects.create(name="G", created_by=owner)
+    GroupUser.objects.create(group=group, user=owner, is_admin=True)
+    GroupUser.objects.create(group=group, user=attacker, is_admin=False)  # membro comum
+    client = APIClient()
+    client.force_authenticate(user=attacker)
+
+    resp = client.post(
+        f"/api/v1/groups/{group.pk}/users/", {"user_id": str(victim.pk)}, format="json"
+    )
+
+    assert resp.status_code == 403
+    assert not GroupUser.objects.filter(group=group, user=victim).exists()
+
+
+def test_secrets_put_requires_write_permission(owner, attacker):
+    resource = make_password(owner, data="v1")
+    # attacker tem apenas LEITURA (Secret + Permission READ)
+    Secret.objects.create(resource=resource, user=attacker, data="v1")
+    Permission.objects.create(
+        aco="Resource", aco_foreign_key=resource.pk, aro="User",
+        aro_foreign_key=attacker.pk, type=Permission.READ, created_by=owner,
+    )
+    client = APIClient()
+    client.force_authenticate(user=attacker)
+
+    resp = client.put(
+        f"/api/v1/resources/{resource.pk}/secrets/", {"data": "hackeado"}, format="json"
+    )
+
+    assert resp.status_code == 403
+    assert Secret.objects.get(resource=resource, user=attacker).data == "v1"
+
+
 def test_share_folder_denies_non_owner(owner, attacker, victim):
     folder = Folder.objects.create(name="F", created_by=owner)
     client = APIClient()

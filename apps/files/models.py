@@ -7,7 +7,9 @@ from apps.core.models import BaseModel
 
 
 class FileResource(BaseModel):
-    """Metadados de um arquivo criptografado armazenado no MinIO. O conteúdo em claro NUNCA é conhecido pelo servidor."""
+    """Metadados de um arquivo. O conteúdo é cifrado em repouso no servidor
+    (Fernet, ver apps/core/crypto.py) antes de ir para o storage — protege contra
+    vazamento do banco/backup/storage. NÃO é E2E: o servidor consegue decifrar."""
 
     class EncryptionVersion(models.TextChoices):
         OPENPGP_V1 = "openpgp-aes256gcm-v1", "OpenPGP + AES-256-GCM v1"
@@ -60,7 +62,9 @@ class FileResource(BaseModel):
 
 
 class FileSecret(BaseModel):
-    """Chave de sessão AES-256 criptografada com a chave pública PGP de cada usuário."""
+    """Marca que um usuário tem acesso ao arquivo. (O campo session_key_encrypted
+    é um marcador legado — a cifragem do conteúdo é feita no servidor via Fernet,
+    não por chave de sessão por-usuário.)"""
 
     file_resource = models.ForeignKey(
         FileResource, on_delete=models.CASCADE, related_name="secrets"
