@@ -129,12 +129,10 @@ def logout_view(request):
 
 
 def _client_ip(request):
-    """IP real do cliente. Atrás de proxy reverso (Coolify/Traefik) o REMOTE_ADDR
-    é o IP interno do proxy; o IP de origem vem em X-Forwarded-For (mais à esquerda)."""
-    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "")
+    """IP real do cliente, resolvido de forma consciente do proxy reverso
+    (ver apps/core/net.client_ip)."""
+    from apps.core.net import client_ip
+    return client_ip(request)
 
 
 @ratelimit(key="ip", rate="5/h", method="POST", block=False)
@@ -1203,6 +1201,7 @@ def mfa_setup(request):
 
 
 @ratelimit(key="ip", rate="10/m", method="POST", block=False)
+@ratelimit(key="apps.core.net.mfa_target_key", rate="10/m", method="POST", block=False)
 def mfa_verify(request):
     user_id = request.session.get("mfa_user_id")
     if not user_id:

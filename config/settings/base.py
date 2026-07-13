@@ -251,6 +251,12 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 
+# Proxy reverso: nº de proxies confiáveis à frente do app (Coolify/Traefik = 1).
+# Usado para resolver o IP real do cliente (rate limiting e auditoria) de forma
+# resistente a spoofing do X-Forwarded-For.
+TRUSTED_PROXY_COUNT = env.int("TRUSTED_PROXY_COUNT", default=1)
+RATELIMIT_IP_META_KEY = "apps.core.net.client_ip"
+
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------

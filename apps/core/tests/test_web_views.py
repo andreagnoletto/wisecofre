@@ -115,6 +115,21 @@ def test_failed_login_records_attempted_email(db):
     assert log.context.get("email") == "ghost@x.io"
 
 
+def test_mfa_verify_per_user_ratelimit_key_resolves(db):
+    from django.core.cache import cache
+    cache.clear()
+    user = User.objects.create_user(username="mfa", email="mfa@x.io", password="x")
+    client = Client()
+    s = client.session
+    s["mfa_user_id"] = str(user.pk)
+    s.save()
+
+    resp = client.post(reverse("mfa_verify"), {"code": "000000"})
+
+    # o importante é não dar 500 (a chave por-usuário resolve corretamente)
+    assert resp.status_code in (200, 302)
+
+
 def test_login_is_rate_limited_after_repeated_failures(db):
     from django.core.cache import cache
     cache.clear()
@@ -329,13 +344,16 @@ def test_file_detail_shows_access_log_date(owner):
     assert "203.0.113.9" in body
 
 
-def test_client_ip_prefers_forwarded_for(db):
+def test_client_ip_resolves_real_client_behind_proxy(db, settings):
     from django.test import RequestFactory
 
     from apps.core.views_web import _client_ip
 
+    settings.TRUSTED_PROXY_COUNT = 1
+    # 1 proxy confiável: o IP real é o adicionado pelo proxy (mais à direita);
+    # o valor à esquerda pode ser spoof do cliente.
     req = RequestFactory().get(
-        "/", HTTP_X_FORWARDED_FOR="198.51.100.7, 10.0.0.1", REMOTE_ADDR="10.0.0.1",
+        "/", HTTP_X_FORWARDED_FOR="6.6.6.6, 198.51.100.7", REMOTE_ADDR="10.0.0.1",
     )
     assert _client_ip(req) == "198.51.100.7"
 

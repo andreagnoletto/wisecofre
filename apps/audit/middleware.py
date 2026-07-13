@@ -53,8 +53,8 @@ ROUTE_LABELS = {
 
 
 def _get_ip(request):
-    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    return xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "0.0.0.0")
+    from apps.core.net import client_ip
+    return client_ip(request)
 
 
 class AuditMiddleware(MiddlewareMixin):
