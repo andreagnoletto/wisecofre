@@ -181,6 +181,36 @@ def test_audit_export_neutralizes_formula_injection(db):
     assert "'=SUM(A1)" in body  # célula neutralizada com aspa simples
 
 
+def test_folder_with_passwords_hides_no_subfolder_empty_state(owner):
+    folder = Folder.objects.create(name="F", created_by=owner)
+    rt, _ = ResourceType.objects.get_or_create(slug="password", defaults={"name": "Senha"})
+    resource = Resource.objects.create(
+        name="teste senha em grupo", resource_type=rt, created_by=owner, folder=folder,
+    )
+    Secret.objects.create(resource=resource, user=owner, data="x")
+    client = Client()
+    client.force_login(owner)
+
+    resp = client.get(reverse("folder_detail", args=[folder.pk]))
+
+    body = resp.content.decode()
+    assert resp.status_code == 200
+    assert "teste senha em grupo" in body          # a senha aparece
+    assert "Nenhuma sub-pasta" not in body          # não mostra o estado-vazio confuso
+    assert "Esta pasta não tem sub-pastas" not in body
+
+
+def test_truly_empty_folder_shows_empty_state(owner):
+    folder = Folder.objects.create(name="Vazia", created_by=owner)
+    client = Client()
+    client.force_login(owner)
+
+    resp = client.get(reverse("folder_detail", args=[folder.pk]))
+
+    assert resp.status_code == 200
+    assert "Pasta vazia" in resp.content.decode()
+
+
 def test_settings_page_shows_security_status(db):
     admin = User.objects.create_user(
         username="s", email="s@x.io", password="x", role="ADMIN", is_staff=True,
